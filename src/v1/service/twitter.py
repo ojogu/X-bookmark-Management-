@@ -6,6 +6,7 @@ import hashlib
 import requests
 from typing import Dict, Any
 from src.utils.config import config
+from src.v1.service.user import UserService
 
 # In-memory PKCE verifier store - back to storing code_verifier as string
 oauth_sessions: dict[str, str] = {}
@@ -22,7 +23,8 @@ logger = setup_logger(__name__, file_path="service.log")
 
 
 class TwitterService:
-    def __init__(self):
+    def __init__(self, user_service: UserService):
+        self.user_service = user_service
         self.client_id = config.client_id
         self.redirect_uri = config.redirect_uri
         self.scope = [

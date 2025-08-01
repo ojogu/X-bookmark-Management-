@@ -3,16 +3,36 @@ from fastapi.responses import RedirectResponse
 from .schema import Webhook
 from src.utils.log import setup_logger
 from src.v1.service.twitter import TwitterService
-
+from src.v1.service.user import UserService
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.utils.db import init_db
 
 auth_router = APIRouter(prefix="/auth")
 logger = setup_logger(__name__, file_path="auth.log")
 
-# At module level. store code in database for prod, don't share the same instance 
-shared_client = TwitterService()
 
-def get_twitter_client():
-    return shared_client
+
+def get_user_service():
+    """
+    Dependency function to get an instance of UserService.
+
+    Returns:
+        UserService: An instance of the user service.
+    """
+    return UserService(init_db)
+
+
+def get_twitter_client(user_service: UserService = Depends(get_user_service)):
+    """
+    Dependency function to get an instance of TwitterService.
+
+    Args:
+        user_service (UserService): The user service dependency.
+
+    Returns:
+        TwitterService: An instance of the Twitter service.
+    """
+    return TwitterService(user_service)
 
 @auth_router.get("/login", status_code=status.HTTP_200_OK)
 async def handle_login(twitter_client: TwitterService = Depends(get_twitter_client)):
@@ -62,4 +82,3 @@ async def handle_callback(request: Request, twitter_client: TwitterService = Dep
 async def user_info(twitter_client: TwitterService = Depends(get_twitter_client)):
     user_info = await twitter_client.get_user_info()
     return user_info
-    
