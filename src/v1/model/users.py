@@ -1,18 +1,20 @@
-from base.model import BaseModel
+
+from src.v1.base.model import BaseModel
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 class User(BaseModel):
     __tablename__ = "users"
     x_id = sa.Column(sa.String, nullable=False)
-    profile_photo = sa.Column(sa.String, nullable=False)
+    profile_photo_url = sa.Column(sa.String, nullable=False)
     name = sa.Column(sa.String, nullable=False)
     username = sa.Column(sa.String, unique=True, nullable=False)
+    #relationship 
     token = relationship("UserToken", uselist=False, back_populates="user")
 
 class UserToken(BaseModel):
     __tablename__ = "user_tokens"
-    user_id = sa.Column(sa.Integer, sa.ForeignKey('users.id'), unique=True, nullable=False)
+    user_id = sa.Column(sa.UUID, sa.ForeignKey('users.id'), unique=True, nullable=False)
     access_token = sa.Column(sa.String, nullable=False)
     scope = sa.Column(sa.String, nullable=False)
     refresh_token = sa.Column(sa.String, nullable=False)
@@ -23,6 +25,6 @@ class UserToken(BaseModel):
     
     def calculate_expiration(self):
             """Calculate expiration timestamp based on token data."""
-            return datetime.datetime.now(timezone.utc) + datetime.timedelta(
+            return datetime.datetime.now(timezone.utc) + timedelta(
                 seconds=self.expires_in
             )

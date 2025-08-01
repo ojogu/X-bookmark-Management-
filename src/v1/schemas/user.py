@@ -1,16 +1,21 @@
 from datetime import datetime
 from pydantic import BaseModel
 
+
+
+class UserDataFromOauth(BaseModel):
+    id:str
+    username:str
+    name:str
+    profile_image_url:str
+    followers_count:str
+    following_count:str
+    
 class UserCreate(BaseModel):
     x_id: str
     profile_photo: str
     name: str
-    access_token: str
-    refresh_token: str
-    email: str
-    username: str
-    expires_in: datetime
-    fetched_at: datetime
+
     
     class Config:
         json_encoders = {

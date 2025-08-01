@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.v1.model.users import User
+from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
 from src.v1.base.exception import (
     Environment_Variable_Exception,
@@ -29,7 +29,7 @@ class UserService():
         x_id = user_data["id"]
         logger.info(f"Attempting to create user with x_id: {x_id}")
         
-        is_user = self.check_if_user_exist(x_id)
+        is_user = self.check_if_user_exist_X_id(x_id)
         if is_user:
             logger.warning(f"User creation failed - x_id {x_id} already exists")
             raise AlreadyExistsError(f"user with id: {x_id} already exist")
@@ -62,7 +62,13 @@ class UserService():
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
             raise DatabaseError(f"Could not create user: {e}") from e
 
+    async def store_user_token(self, user_id:str, user_token:dict):
+        pass 
     
-    async def check_if_user_exist(self, x_id: str):
+    async def check_if_user_exist_X_id(self, x_id: str):
         result = await self.db.execute(sa.select(User).where(x_id == User.x_id))
+        return True if result.scalar_one_or_none() else False
+    
+    async def check_if_user_exists_user_id(self, user_id:str):
+        result = await self.db.execute(sa.select(UserToken).where(user_id == UserToken.user_id))
         return True if result.scalar_one_or_none() else False

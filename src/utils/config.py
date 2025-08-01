@@ -9,6 +9,8 @@ class Config(BaseSettings):
     api_key: str
     api_secret: str
     redirect_uri:str 
+    redis_host: str
+    redis_port:int
     
 
     model_config = SettingsConfigDict(

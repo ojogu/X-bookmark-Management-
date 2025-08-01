@@ -7,12 +7,11 @@ import requests
 from typing import Dict, Any
 from src.utils.config import config
 from src.v1.service.user import UserService
+from src.v1.service.oauth_session import OAuthSessionService
+from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
+# In-memory PKCE verifier store - back to storing code_verifier as string (use redis in prod)
+# oauth_sessions: dict[str, str] = {}
 
-# In-memory PKCE verifier store - back to storing code_verifier as string
-oauth_sessions: dict[str, str] = {}
-
-# Store OAuth2UserHandler instances by state to maintain PKCE verifiers
-# oauth_sessions: dict[str, tweepy.OAuth2UserHandler] = {}
 
 
 
@@ -21,9 +20,9 @@ logger = setup_logger(__name__, file_path="service.log")
 
 
 
-
 class TwitterService:
     def __init__(self, user_service: UserService):
+        self.session = OAuthSessionService
         self.user_service = user_service
         self.client_id = config.client_id
         self.redirect_uri = config.redirect_uri
@@ -52,7 +51,8 @@ class TwitterService:
             state = secrets.token_urlsafe(32)
             
             # Store the code_verifier using our own state
-            oauth_sessions[state] = code_verifier
+            await self.session.save_oauth_session(state=state, code_verifier=code_verifier)
+            # oauth_sessions[state] = code_verifier
             logger.info(f"Storing code_verifier for state={state}")
             
             # Build auth URL manually to have full control
@@ -91,14 +91,20 @@ class TwitterService:
             logger.info(f"Authorization response URL: {auth_url_str}")
             
             # Retrieve code_verifier from session
-            code_verifier = oauth_sessions.get(state)
+            data = await self.session.get_oauth_session(state=state)
+            code_verifier = await self.session.get_code_verifier(state)
+            
+            #comment this out when tested
+            # code_verifier = oauth_sessions.get(state)
+            
             if not code_verifier:
                 logger.error(f"No code_verifier found for state: '{state}'")
-                logger.error(f"Available states: {list(oauth_sessions)}")
+                logger.error(f"Available states: {list(data)}")
                 raise ValueError("Invalid or expired state parameter")
             
             # Clean up session
-            del oauth_sessions[state]
+            await self.session.cleanup_oauth_session(state)
+            logger.info("cleaned up data for state")
             
             # Extract authorization code from URL
             import urllib.parse as urlparse
@@ -153,19 +159,22 @@ class TwitterService:
                         "User-Agent": "TwitterOAuth2Client/1.0"
                     }
                 ) as response:
-                    response = await response.json()
-            logger.info(f"Token response status: {response.status_code}")
+                    data:dict = await response.json()
+            logger.info(f"Token response status: {response.status}")
             # logger.info(f"Token response headers: {dict(response.headers)}")
             
-            if response.status_code != 200:
+            if response.status != 200:
                 logger.error(f"Token request failed: {response.text}")
-                raise ValueError(f"Token exchange failed: {response.status_code} - {response.text}")
+                raise ValueError(f"Token exchange failed: {response.status} - {response.text}")
             
-            self.token_response:dict = response.json()
+            self.token_response:dict = User_Token(**data).model_dump()
             logger.info(f"token type: {type(self.token_response)}")
             logger.info("Successfully exchanged code for tokens")
             logger.info(f"Token response keys: {list(self.token_response.items())}")
-            
+            access_token = self.token_response["access_token"]
+            user_data = await self.get_user_info_store_in_db(access_token)
+
+            logger.info(f"user data: {user_data}")
             return self.token_response #store in db
             
         except Exception as e:
@@ -192,7 +201,7 @@ class TwitterService:
             logger.error(f"Token refresh failed: {str(e)}", exc_info=True)
             
         
-    async def _get_user_info(self, access_token) -> Dict[str, Any]:
+    async def get_user_info_store_in_db(self, access_token) -> Dict[str, Any]:
             # self.access_token = self.token_response.get("access_token") #fetch from db
             """Get authenticated user's information using direct HTTP request"""
             try:
@@ -225,12 +234,12 @@ class TwitterService:
                     "followers_count": user_data.get('public_metrics', {}).get('followers_count', 0),
                     "following_count": user_data.get('public_metrics', {}).get('following_count', 0)
                 }
-                
                 logger.info(f"Retrieved user info for: {user_data['username']}")
-                return user_info
+                validated_data = UserDataFromOauth(**user_data).model_dump()
+                final_data = UserCreate(**validated_data).model_dump()
+                new_user = await self.user_service.create_user(final_data)
+                return new_user
                 
             except Exception as e:
                 logger.error(f"Failed to get user info: {str(e)}", exc_info=True)
                 raise
-
-            raise

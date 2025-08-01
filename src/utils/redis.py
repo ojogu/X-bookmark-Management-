@@ -3,8 +3,8 @@ import json
 import redis.asyncio as redis
 from typing import Optional
 from src.utils.config import config
-REDIS_HOST = config.REDIS_HOST
-REDIS_PORT = config.REDIS_PORT
+REDIS_HOST = config.redis_host
+REDIS_PORT = config.redis_port
 CACHE_TTL = 3600  # 1 hour
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
 
