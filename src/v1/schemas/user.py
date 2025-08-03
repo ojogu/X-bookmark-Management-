@@ -1,20 +1,27 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 
 class UserDataFromOauth(BaseModel):
-    id:str
-    username:str
-    name:str
-    profile_image_url:str
-    followers_count:str
-    following_count:str
+    id: str 
+    username: str
+    name: str
+    profile_image_url: str
+    public_metrics: dict = {
+        'followers_count': int,
+        'following_count': int,
+        'tweet_count': int,
+        'listed_count': int,
+        'like_count': int,
+        'media_count': int
+    }
     
 class UserCreate(BaseModel):
-    x_id: str
-    profile_photo: str
+    x_id: str = Field(alias="id")
+    profile_image_url: str
     name: str
+    username:str
 
     
     class Config:

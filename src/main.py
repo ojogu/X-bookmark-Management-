@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import uvicorn
 from contextlib import asynccontextmanager
 # from utils.db import init_db
-from src.utils.db import init_db
+from src.utils.db import init_db, drop_db
 from src.utils.redis import setup_redis
 from src.v1.auth.routes import auth_router
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +24,11 @@ async def life_span(app: FastAPI):
     Yields:
         None: This function yields control back to the application after startup.
     """
+    
+    # print(f"dropping db....")
+    # await drop_db()
+    # print(f"db dropped")
+    
     # Startup: Initialize the database
     print(f"server is starting....")
     await init_db()

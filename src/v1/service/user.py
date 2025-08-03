@@ -26,13 +26,14 @@ class UserService():
         self.db = db
     
     async def create_user(self, user_data: dict):
-        x_id = user_data["id"]
+        x_id = user_data["x_id"]
         logger.info(f"Attempting to create user with x_id: {x_id}")
         
-        is_user = self.check_if_user_exist_X_id(x_id)
-        if is_user:
-            logger.warning(f"User creation failed - x_id {x_id} already exists")
-            raise AlreadyExistsError(f"user with id: {x_id} already exist")
+        user = await self.check_if_user_exist_X_id(x_id)
+        if user:
+            logger.warning(f" {x_id} already exists. Return our jwt to authenticate user for our app")
+            return user
+        
             
         new_user = User(**user_data)
         self.db.add(new_user)
@@ -55,20 +56,58 @@ class UserService():
                 )
             else:
                 logger.error(f"Database integrity error for user {x_id}: {str(e)}")
-                raise DatabaseError(f"Database integrity error: {e}") from e
+                raise ServerError(f"Database integrity error: {e}") from e
                 
         except SQLAlchemyError as e:
             await self.db.rollback()
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
-            raise DatabaseError(f"Could not create user: {e}") from e
+            raise ServerError(f"Could not create user: {e}") from e
 
     async def store_user_token(self, user_id:str, user_token:dict):
-        pass 
+        user = await self.check_if_user_exists_user_id(user_id)
+        if not user:
+            raise NotFoundError("User id not found, register")
+        user_tokens = UserToken(
+            user_id=user_id,
+            **user_token
+            )
+        self.db.add(user_tokens)
+        try:
+            await self.db.flush() #to get potential error before commit
+            await self.db.refresh(user_tokens)  # Refresh to get DB defaults like ID, created_at
+            await self.db.commit()
+            logger.info(f"Successfully created token for uaer with user_id: {user_tokens.user_id}")
+            return user_tokens
+        
+        except IntegrityError as e:
+            await self.db.rollback()
+            logger.error(f"IntegrityError while creating user token {user_tokens.id} for user {user_tokens.user_id}: {str(e)}")
+            # Check if it's a unique constraint violation (though checked above, good practice)
+            if "unique constraint" in str(e).lower():
+                raise AlreadyExistsError(
+                    f"user_id '{user_tokens.user_id}'already exists (concurrent request?)."
+                )
+            else:
+                logger.error(f"Database integrity error for user {user_tokens.user_id}: {str(e)}")
+                raise ServerError(f"Database integrity error: {e}") from e
+                
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"SQLAlchemy error while creating user_tokens for user: {user_tokens.user_id} : {str(e)}")
+            raise ServerError(f"Could not create user: {e}") from e
+
     
     async def check_if_user_exist_X_id(self, x_id: str):
         result = await self.db.execute(sa.select(User).where(x_id == User.x_id))
-        return True if result.scalar_one_or_none() else False
+        if not result:
+            return None
+        return result.scalar_one_or_none() 
+        # return True if result.scalar_one_or_none() else False
     
     async def check_if_user_exists_user_id(self, user_id:str):
-        result = await self.db.execute(sa.select(UserToken).where(user_id == UserToken.user_id))
+        result = await self.db.execute(sa.select(User).where(user_id == User.id))
         return True if result.scalar_one_or_none() else False
+    
+    
+    async def is_token_expired(self, user_id):
+        pass 
