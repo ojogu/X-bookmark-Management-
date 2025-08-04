@@ -67,9 +67,10 @@ async def handle_callback(request: Request, twitter_client: TwitterAuthService =
                 detail="Missing authorization code or state"
             )
         
-        fetch_token = await twitter_client.fetch_token_store_token(authorization_response_url=request.url, state=state)
+        in_app_access_token = await twitter_client.fetch_token_store_token(authorization_response_url=request.url, state=state)
         return {
-            "msg": "auth successful"
+            "msg": "auth successful",
+            "access_token": in_app_access_token
         }
         
 

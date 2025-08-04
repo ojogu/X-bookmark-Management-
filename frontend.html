@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Test App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #1da1f2, #14171a);
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .login-btn {
+            background: linear-gradient(45deg, #1da1f2, #0d8bd9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 161, 242, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .user-info {
+            display: none;
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .user-info h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .user-details {
+            text-align: left;
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .user-details p {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        .user-details strong {
+            color: #333;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+
+        .token-display {
+            background: #e9ecef;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">𝕏</div>
+        <h1>OAuth Test App</h1>
+        <p class="subtitle">Test your backend OAuth implementation</p>
+        
+        <div id="error-container"></div>
+        
+        <div id="login-section">
+            <button id="loginBtn" class="login-btn">
+                <span>🔑</span>
+                Sign in with Twitter/X
+            </button>
+        </div>
+        
+        <div id="user-info" class="user-info">
+            <h2>✅ Login Successful!</h2>
+            <div class="user-details">
+                <p><strong>Status:</strong> Authenticated</p>
+                <p><strong>JWT Token:</strong></p>
+                <div id="token-display" class="token-display"></div>
+            </div>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Update these URLs to match your backend
+        const BACKEND_URL = 'http://127.0.0.1:8000'; // Your FastAPI backend URL
+        const LOGIN_ENDPOINT = '/auth/login';
+        
+        // DOM elements
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginSection = document.getElementById('login-section');
+        const userInfo = document.getElementById('user-info');
+        const tokenDisplay = document.getElementById('token-display');
+        const errorContainer = document.getElementById('error-container');
+        
+        // Check for existing token on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
+            handleURLParams();
+        });
+        
+        // Check if user is already authenticated
+        function checkAuthStatus() {
+            const token = localStorage.getItem('jwt_token');
+            
+            if (token && !isTokenExpired(token)) {
+                showUserInfo(token);
+            } else {
+                showLoginButton();
+                // Clear expired token
+                if (token) {
+                    localStorage.removeItem('jwt_token');
+                }
+            }
+        }
+        
+        // Handle URL parameters (token from OAuth callback)
+        function handleURLParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                showError(`Authentication failed: ${error}`);
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return;
+            }
+            
+            if (token) {
+                // Store the token
+                localStorage.setItem('jwt_token', token);
+                showUserInfo(token);
+                
+                // Clean up URL (remove token from address bar for security)
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+        
+        // Check if JWT token is expired
+        function isTokenExpired(token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const currentTime = Date.now() / 1000;
+                return payload.exp < currentTime;
+            } catch (e) {
+                return true; // If we can't parse it, consider it expired
+            }
+        }
+        
+        // Login button click handler
+        loginBtn.addEventListener('click', async () => {
+            try {
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = '<span class="loading">Loading...</span>';
+                
+                // Call your backend login endpoint
+                const response = await fetch(`${BACKEND_URL}${LOGIN_ENDPOINT}`);
+                const data = await response.json();
+                
+                if (response.ok && data.url) {
+                    // Redirect to OAuth URL
+                    window.location.href = data.url;
+                } else {
+                    showError('Failed to get authentication URL');
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = '<span>🔑</span> Sign in with Twitter/X';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Network error: Could not connect to backend');
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<span>🔑</span> Sign in with Twitter/X';
+            }
+        });
+        
+        // Logout button click handler
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('jwt_token');
+            showLoginButton();
+            clearError();
+        });
+        
+        // Show login button
+        function showLoginButton() {
+            loginSection.style.display = 'block';
+            userInfo.style.display = 'none';
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<span>🔑</span> Sign in with Twitter/X';
+        }
+        
+        // Show user info
+        function showUserInfo(token) {
+            loginSection.style.display = 'none';
+            userInfo.style.display = 'block';
+            
+            // Display token (truncate for security/readability)
+            const truncatedToken = token.length > 100 ? 
+                token.substring(0, 50) + '...' + token.substring(token.length - 50) : 
+                token;
+            tokenDisplay.textContent = truncatedToken;
+            
+            clearError();
+        }
+        
+        // Show error message
+        function showError(message) {
+            errorContainer.innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        // Clear error message
+        function clearError() {
+            errorContainer.innerHTML = '';
+        }
+        
+        // Test API call with stored token (optional - for testing)
+        async function testAPICall() {
+            const token = localStorage.getItem('jwt_token');
+            if (!token) return;
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/protected-route`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.status === 401) {
+                    // Token expired or invalid
+                    localStorage.removeItem('jwt_token');
+                    showLoginButton();
+                    showError('Session expired. Please login again.');
+                }
+            } catch (error) {
+                console.error('API call failed:', error);
+            }
+        }
+    </script>
+</body>
+</html>

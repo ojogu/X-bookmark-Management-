@@ -3,6 +3,8 @@ from src.v1.base.model import BaseModel
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, timedelta
+from sqlalchemy.ext.hybrid import hybrid_property
+
 class User(BaseModel):
     __tablename__ = "users"
     x_id = sa.Column(sa.String, nullable=False)
@@ -22,3 +24,13 @@ class UserToken(BaseModel):
     expires_at = sa.Column(sa.DateTime(timezone=True))
     user = relationship("User", back_populates="token")
     
+@hybrid_property
+def is_expired(self):
+    """Returns True if the current time is past the expiration time."""
+    return self.expires_at and datetime.now(tz=timezone.utc) > self.expires_at
+
+
+@is_expired.expression
+def is_expired(cls):
+    """SQL expression to check if the row is expired."""
+    return cls.expires_at != None and sa.func.now() > cls.expires_at

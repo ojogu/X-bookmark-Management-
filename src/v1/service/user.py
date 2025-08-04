@@ -108,6 +108,23 @@ class UserService():
         result = await self.db.execute(sa.select(User).where(user_id == User.id))
         return True if result.scalar_one_or_none() else False
     
+    async def fetch_user_token(self, user_id):
+        result = await self.db.execute(
+            sa.select(UserToken).where(
+                user_id = UserToken.user_id
+            )
+        )
+        return result.scalar_one_or_none()
     
     async def is_token_expired(self, user_id):
-        pass 
+        result = await self.db.execute(
+            sa.select(UserToken).where(
+                sa.and_(
+                    user_id == UserToken.user_id,
+                    UserToken.is_expired == True
+                    )
+                
+                )
+            )
+        logger.info(type(result))
+        return result.scalar_one_or_none()

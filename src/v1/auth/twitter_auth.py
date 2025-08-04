@@ -10,7 +10,7 @@ from src.v1.service.user import UserService
 from src.v1.service.oauth_session import OAuthSessionService
 from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
 from datetime import datetime, timedelta, timezone
-
+from src.v1.auth.service import auth_service
 # In-memory PKCE verifier store - back to storing code_verifier as string (use redis in prod)
 # oauth_sessions: dict[str, str] = {}
 
@@ -76,10 +76,11 @@ class TwitterAuthService:
             
             logger.info(f"Generated auth URL: {auth_url[:10]}")
             logger.info("Generated authorization URL successfully")
-            return {
-                "auth_url": auth_url,
-                "state": state
-            }
+            return auth_url
+            # return {
+            #     "auth_url": auth_url,
+            #     "state": state
+            # }
 
         except Exception as e:
             logger.error(f"Failed to generate auth URL: {str(e)}", exc_info=True)
@@ -202,7 +203,14 @@ class TwitterAuthService:
             #functions to store user token, with user_id for proper data intergrity 
             user_tokens = await self.user_service.store_user_token(user_id=user_id, user_token=self.token_response)
             logger.info(f"tokens stored for user with user_id: {user_data.id}")
-            return self.token_response 
+            
+            #return jwt 
+            payload = {
+                "user_id": str(user_id),
+                "x_id": user_data.x_id
+            }
+            in_app_access_token = auth_service.create_access_token(user_data=payload)
+            return in_app_access_token 
             
         except Exception as e:
             logger.error(f"Token exchange failed: {str(e)}", exc_info=True)

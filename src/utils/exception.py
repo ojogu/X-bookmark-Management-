@@ -1,5 +1,4 @@
-import os
-import logging
+
 from typing import Any, Callable, Dict
 from fastapi import FastAPI, Request, HTTPException, status
 from src.v1.base.schema import ErrorResponse

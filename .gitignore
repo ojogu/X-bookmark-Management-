@@ -8,6 +8,8 @@ wheels/
 
 # Virtual environments
 /env
+
 .env
 /logs
 dump.rdb
+tasks.txt

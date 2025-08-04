@@ -11,7 +11,9 @@ class Config(BaseSettings):
     redirect_uri:str 
     redis_host: str
     redis_port:int
-    
+    jwt_secret_key:str
+    jwt_algo:str 
+    access_token_expiry:int
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
