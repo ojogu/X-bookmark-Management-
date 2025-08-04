@@ -63,38 +63,45 @@ class UserService():
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
             raise ServerError(f"Could not create user: {e}") from e
 
-    async def store_user_token(self, user_id:str, user_token:dict):
+    async def store_user_token(self, user_id: str, user_token: dict):
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:
             raise NotFoundError("User id not found, register")
-        user_tokens = UserToken(
-            user_id=user_id,
-            **user_token
-            )
-        self.db.add(user_tokens)
+
+        result = await self.db.execute(
+            sa.select(UserToken).where(UserToken.user_id == user_id)
+        )
+        existing_token = result.scalar_one_or_none()
+
+        if existing_token:
+            logger.info(f"Found existing token for user {user_id}, updating.")
+            for key, value in user_token.items():
+                setattr(existing_token, key, value)
+            user_tokens = existing_token
+        else:
+            logger.info(f"No existing token for user {user_id}, creating new one.")
+            user_tokens = UserToken(user_id=user_id, **user_token)
+            self.db.add(user_tokens)
+
         try:
-            await self.db.flush() #to get potential error before commit
-            await self.db.refresh(user_tokens)  # Refresh to get DB defaults like ID, created_at
+            await self.db.flush()
+            await self.db.refresh(user_tokens)
             await self.db.commit()
-            logger.info(f"Successfully created token for uaer with user_id: {user_tokens.user_id}")
+            logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}")
             return user_tokens
-        
         except IntegrityError as e:
             await self.db.rollback()
-            logger.error(f"IntegrityError while creating user token {user_tokens.id} for user {user_tokens.user_id}: {str(e)}")
-            # Check if it's a unique constraint violation (though checked above, good practice)
+            logger.error(f"IntegrityError while storing token for user {user_id}: {e}")
             if "unique constraint" in str(e).lower():
                 raise AlreadyExistsError(
-                    f"user_id '{user_tokens.user_id}'already exists (concurrent request?)."
+                    f"Token for user_id '{user_id}' already exists (concurrent request?)."
                 )
             else:
-                logger.error(f"Database integrity error for user {user_tokens.user_id}: {str(e)}")
                 raise ServerError(f"Database integrity error: {e}") from e
-                
         except SQLAlchemyError as e:
             await self.db.rollback()
-            logger.error(f"SQLAlchemy error while creating user_tokens for user: {user_tokens.user_id} : {str(e)}")
-            raise ServerError(f"Could not create user: {e}") from e
+            logger.error(f"Database error while storing token for user {user_id}: {e}")
+            raise ServerError(f"Could not store token: {e}") from e
 
     
     async def check_if_user_exist_X_id(self, x_id: str):
@@ -105,14 +112,12 @@ class UserService():
         # return True if result.scalar_one_or_none() else False
     
     async def check_if_user_exists_user_id(self, user_id:str):
-        result = await self.db.execute(sa.select(User).where(user_id == User.id))
-        return True if result.scalar_one_or_none() else False
+        result = await self.db.execute(sa.select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
     
     async def fetch_user_token(self, user_id):
         result = await self.db.execute(
-            sa.select(UserToken).where(
-                user_id = UserToken.user_id
-            )
+            sa.select(UserToken).where(UserToken.user_id == user_id)
         )
         return result.scalar_one_or_none()
     
@@ -120,11 +125,9 @@ class UserService():
         result = await self.db.execute(
             sa.select(UserToken).where(
                 sa.and_(
-                    user_id == UserToken.user_id,
+                    UserToken.user_id == user_id,
                     UserToken.is_expired == True
-                    )
-                
                 )
             )
-        logger.info(type(result))
+        )
         return result.scalar_one_or_none()

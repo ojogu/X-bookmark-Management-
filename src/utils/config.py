@@ -14,6 +14,7 @@ class Config(BaseSettings):
     jwt_secret_key:str
     jwt_algo:str 
     access_token_expiry:int
+    frontend_url:str
 
     model_config = SettingsConfigDict(
         case_sensitive=False,

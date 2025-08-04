@@ -86,7 +86,7 @@ class TwitterAuthService:
             logger.error(f"Failed to generate auth URL: {str(e)}", exc_info=True)
             raise
 
-    async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> Dict[str, Any]:
+    async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> str:
         """Exchange authorization code for access token using manual PKCE"""
         try:
             # Convert URL object to string if needed

@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, status, Request, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.responses import RedirectResponse
+import httpx
 from .schema import Webhook
 from src.utils.log import setup_logger
 from .twitter_auth import TwitterAuthService
 from src.v1.service.user import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
-
+from src.utils.config import config
 auth_router = APIRouter(prefix="/auth")
 logger = setup_logger(__name__, file_path="auth.log")
 
@@ -18,6 +20,7 @@ def get_user_service(db: AsyncSession = Depends(get_session)):
         UserService: An instance of the user service.
     """
     return UserService(db=db)
+
 
 
 
@@ -44,10 +47,13 @@ async def handle_login(twitter_client: TwitterAuthService = Depends(get_twitter_
         logger.error(f"Failed to generate auth URL: {str(e)}", exc_info=True)
         return {"error": "Authentication failed"}, status.HTTP_500_INTERNAL_SERVER_ERROR
 
-@auth_router.get("/callback", status_code=status.HTTP_200_OK)
-async def handle_callback(request: Request, twitter_client: TwitterAuthService = Depends(get_twitter_client)):
+
+@auth_router.get("/callback")
+async def handle_callback(
+    request: Request, 
+    twitter_client: TwitterAuthService = Depends(get_twitter_client)
+):
     try:
-        # Extract parameters from callback
         auth_code = request.query_params.get("code")
         state = request.query_params.get("state")
         error = request.query_params.get("error")
@@ -55,31 +61,35 @@ async def handle_callback(request: Request, twitter_client: TwitterAuthService =
         # Handle authorization errors
         if error:
             logger.error(f"OAuth error: {error}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Authorization failed: {error}"
+            return RedirectResponse(
+                url=f"{config.frontend_url}/login?error={error}",
+                status_code=302
             )
         
         # Validate required parameters
         if not auth_code or not state:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing authorization code or state"
+            return RedirectResponse(
+                url=f"{config.frontend_url}/login?error=missing_params",
+                status_code=302
             )
         
-        in_app_access_token = await twitter_client.fetch_token_store_token(authorization_response_url=request.url, state=state)
-        return {
-            "msg": "auth successful",
-            "access_token": in_app_access_token
-        }
+        # Your service handles all the PKCE/session logic
+        in_app_access_token = await twitter_client.fetch_token_store_token(
+            authorization_response_url=request.url, 
+            state=state
+        )
         
-
+        # Redirect to frontend with JWT
+        return RedirectResponse(
+            url=f"{config.frontend_url}/dashboard?token={in_app_access_token}",
+            status_code=302
+        )
+        
     except Exception as e:
-        logger.error(f"OAuth callback failed: {str(e)}", exc_info=True)
-        return {"error": "OAuth callback failed"}
+        logger.error(f"Callback processing failed: {str(e)}", exc_info=True)
+        return RedirectResponse(
+            url=f"{config.frontend_url}/login?error=auth_failed",
+            status_code=302
+        )
 
 
-@auth_router.get("/user-info")
-async def user_info(twitter_client: TwitterAuthService = Depends(get_twitter_client)):
-    user_info = await twitter_client.get_user_info()
-    return user_info

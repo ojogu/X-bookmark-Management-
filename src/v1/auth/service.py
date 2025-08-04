@@ -19,7 +19,8 @@ class AuthService():
         try:
             payload = {}
             payload["user"] = user_data
-            payload["exp"] = datetime.now() + expiry if expiry is not None else timedelta(seconds = config.access_token_expiry)
+            to_expire = expiry if expiry is not None else timedelta(seconds=config.access_token_expiry)
+            payload["exp"] = datetime.now() + to_expire
             payload["jti"] = str(uuid.uuid4())
             payload["refresh"] = False
             
