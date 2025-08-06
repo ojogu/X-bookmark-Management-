@@ -9,6 +9,7 @@ from src.v1.service.user import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
 from src.utils.config import config
+from urllib.parse import urlencode
 auth_router = APIRouter(prefix="/auth")
 logger = setup_logger(__name__, file_path="auth.log")
 
@@ -74,15 +75,23 @@ async def handle_callback(
             )
         
         # Your service handles all the PKCE/session logic
-        in_app_access_token = await twitter_client.fetch_token_store_token(
+        in_app_token = await twitter_client.fetch_token_store_token(
             authorization_response_url=request.url, 
             state=state
         )
+        in_app_access_token = in_app_token["access_token"]
+        in_app_refresh_token = in_app_token["refresh_token"]
+        
+        #url encode 
+        params = {
+            "access-token": in_app_access_token,
+            "refresh-token": in_app_refresh_token
+        }
         
         # Redirect to frontend with JWT
         return RedirectResponse(
-            url=f"{config.frontend_url}/dashboard?token={in_app_access_token}",
-            status_code=302
+        url = f"{config.frontend_url}/dashboard?{urlencode(params)}",
+        status_code=302
         )
         
     except Exception as e:

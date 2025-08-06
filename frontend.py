@@ -53,7 +53,8 @@ async def login_page():
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     # Extract JWT token from URL parameter
-    token = request.query_params.get("token")
+    access_token = request.query_params.get("access-token")
+    refresh_token = request.query_params.get("refresh-token")
     error = request.query_params.get("error")
     
     if error:
@@ -67,7 +68,7 @@ async def dashboard(request: Request):
         </html>
         """
     
-    if not token:
+    if not access_token:
         return """
         <html>
             <body>
@@ -83,7 +84,8 @@ async def dashboard(request: Request):
         <body>
             <h1>Welcome to Dashboard!</h1>
             <p><strong>You are logged in!</strong></p>
-            <p>Your JWT token: <code>{token[:20]}...</code></p>
+            <p>Your JWT access token: <code>{access_token[:20]}...</code></p>
+            <p>Your JWT refresh token: <code>{refresh_token[:20]}...</code></p>
             
             <h3>Available Actions:</h3>
             <button onclick="makeApiCall()">Test API Call</button>
@@ -93,7 +95,7 @@ async def dashboard(request: Request):
             
             <script>
                 // Store token in localStorage for future API calls
-                localStorage.setItem('jwt_token', '{token}');
+                localStorage.setItem('jwt_token', '{access_token}');
                 
                 // Clean URL (remove token from address bar)
                 window.history.replaceState({{}}, document.title, "/dashboard");

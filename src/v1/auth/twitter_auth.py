@@ -11,9 +11,9 @@ from src.v1.service.oauth_session import OAuthSessionService
 from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
 from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
+from datetime import timedelta
 # In-memory PKCE verifier store - back to storing code_verifier as string (use redis in prod)
 # oauth_sessions: dict[str, str] = {}
-
 
 
 
@@ -86,7 +86,7 @@ class TwitterAuthService:
             logger.error(f"Failed to generate auth URL: {str(e)}", exc_info=True)
             raise
 
-    async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> str:
+    async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> Dict:
         """Exchange authorization code for access token using manual PKCE"""
         try:
             # Convert URL object to string if needed
@@ -210,7 +210,19 @@ class TwitterAuthService:
                 "x_id": user_data.x_id
             }
             in_app_access_token = auth_service.create_access_token(user_data=payload)
-            return in_app_access_token 
+            logger.info(f"in app access token: {in_app_access_token}")
+            
+            #refresh token
+            in_app_refresh_token = auth_service.create_access_token(
+                user_data=payload,
+                refresh=True,
+                expiry=timedelta(days = config.refresh_token_expiry)
+                )
+            logger.info(f"in app refresh token: {in_app_refresh_token}")
+            return {
+                "access_token": in_app_access_token,
+                "refresh_token": in_app_refresh_token
+            }
             
         except Exception as e:
             logger.error(f"Token exchange failed: {str(e)}", exc_info=True)

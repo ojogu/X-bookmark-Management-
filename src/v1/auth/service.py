@@ -22,7 +22,7 @@ class AuthService():
             to_expire = expiry if expiry is not None else timedelta(seconds=config.access_token_expiry)
             payload["exp"] = datetime.now() + to_expire
             payload["jti"] = str(uuid.uuid4())
-            payload["refresh"] = False
+            payload["refresh"] = refresh
             
             token = jwt.encode(
                 payload=payload,
