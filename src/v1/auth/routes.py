@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 auth_router = APIRouter(prefix="/auth")
 logger = setup_logger(__name__, file_path="auth.log")
 
+
 def get_user_service(db: AsyncSession = Depends(get_session)):
     """
     Dependency function to get an instance of UserService.
@@ -21,8 +22,6 @@ def get_user_service(db: AsyncSession = Depends(get_session)):
         UserService: An instance of the user service.
     """
     return UserService(db=db)
-
-
 
 
 
@@ -80,7 +79,9 @@ async def handle_callback(
             state=state
         )
         in_app_access_token = in_app_token["access_token"]
+        logger.info(f"in app access token: {in_app_access_token}")
         in_app_refresh_token = in_app_token["refresh_token"]
+        logger.info(f"in app refresh token: {in_app_refresh_token}")
         
         #url encode 
         params = {

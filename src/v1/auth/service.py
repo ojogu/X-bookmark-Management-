@@ -3,10 +3,18 @@ import jwt
 import uuid
 from src.utils.config import config
 from src.v1.base.exception import TokenExpired
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 
 from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="auth.log")
 
+
+class AccessTokenService(HTTPBearer):
+    def __init__(self, auto_error = True):
+        super().__init__(auto_error=auto_error) 
+
+    async def __call__(self, request):
+        return await super().__call__(request)
 
 class AuthService():
     """this class handles in-app authentication (jwt access token, refresh token)

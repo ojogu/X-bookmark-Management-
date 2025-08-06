@@ -8,7 +8,7 @@ from src.v1.auth.routes import auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from src.utils.config import Settings 
 from src.utils.exception import register_error_handlers
-
+from src.v1.route.twitter import twitter_router
 @asynccontextmanager
 async def life_span(app: FastAPI):
     """
@@ -59,6 +59,9 @@ register_error_handlers(app)
 
 #register routers/blueprint
 app.include_router(auth_router)
+app.include_router(twitter_router)
+
+
 @app.get("/")
 def root():
     """

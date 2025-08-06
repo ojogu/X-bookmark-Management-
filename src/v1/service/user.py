@@ -63,6 +63,7 @@ class UserService():
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
             raise ServerError(f"Could not create user: {e}") from e
 
+
     async def store_user_token(self, user_id: str, user_token: dict):
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:
@@ -74,7 +75,7 @@ class UserService():
         existing_token = result.scalar_one_or_none()
 
         if existing_token:
-            logger.info(f"Found existing token for user {user_id}, updating.")
+            logger.info(f"Found existing token for user {user_id}, updating....")
             for key, value in user_token.items():
                 setattr(existing_token, key, value)
             user_tokens = existing_token
@@ -104,6 +105,7 @@ class UserService():
             raise ServerError(f"Could not store token: {e}") from e
 
     
+    
     async def check_if_user_exist_X_id(self, x_id: str):
         result = await self.db.execute(sa.select(User).where(x_id == User.x_id))
         if not result:
@@ -114,6 +116,7 @@ class UserService():
     async def check_if_user_exists_user_id(self, user_id:str):
         result = await self.db.execute(sa.select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
+    
     
     async def fetch_user_token(self, user_id):
         result = await self.db.execute(
@@ -130,4 +133,4 @@ class UserService():
                 )
             )
         )
-        return result.scalar_one_or_none()
+        return True if result.scalar_one_or_none() else False 
