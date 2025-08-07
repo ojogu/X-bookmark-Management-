@@ -12,6 +12,8 @@ class Environment_Variable_Exception(BaseExceptionClass):
 
 class InUseError(BaseExceptionClass):
     pass
+class InvalidToken(BaseExceptionClass):
+    pass
 
 
 class TokenExpired(BaseExceptionClass):

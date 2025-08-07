@@ -1,20 +1,15 @@
 from datetime import timedelta, datetime
+from fastapi import Request
 import jwt
 import uuid
 from src.utils.config import config
 from src.v1.base.exception import TokenExpired
-from fastapi.security import HTTPBearer, OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
+from src.v1.base.exception import InvalidToken
 
 from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="auth.log")
 
-
-class AccessTokenService(HTTPBearer):
-    def __init__(self, auto_error = True):
-        super().__init__(auto_error=auto_error) 
-
-    async def __call__(self, request):
-        return await super().__call__(request)
 
 class AuthService():
     """this class handles in-app authentication (jwt access token, refresh token)
@@ -65,3 +60,79 @@ class AuthService():
             raise TokenExpired("error decoding token")
 
 auth_service = AuthService()
+
+
+
+class TokenService(HTTPBearer):
+    """
+        Custom HTTP Bearer authentication class for validating JWT access tokens.
+
+        This class extends FastAPI's HTTPBearer to:
+        - Extract Bearer tokens from the Authorization header.
+        - Decode and validate the token using an external `auth_service`.
+        - Ensure the token is not a refresh token.
+        - Raise a custom `InvalidToken` exception if the token is invalid or missing required data.
+
+        Usage:
+            Use as a dependency in FastAPI routes to protect endpoints and extract token data.
+
+        Example:
+            access_token_service = AccessTokenService()
+
+            @router.get("/secure-endpoint")
+            async def secure_endpoint(user_data: dict = Depends(access_token_service)):
+                return {"user": user_data}
+
+        Args:
+            auto_error (bool): Whether to automatically raise an HTTPException
+                if authentication fails. Defaults to True.
+
+        Raises:
+            InvalidToken: If the token is missing, invalid, expired, or is a refresh token.
+        """
+
+    def __init__(self, auto_error: bool = True):
+        super().__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request):
+        # Step 1: Extract token from Authorization header
+        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
+
+        if not credentials or not credentials.scheme.lower() == "bearer":
+            raise InvalidToken("Invalid authentication scheme")
+
+        token = credentials.credentials
+
+        # Step 2: Validate token
+        if not self.token_valid(token):
+            raise InvalidToken("Invalid or expired token")
+
+        # Step 3: Decode token
+        token_data = auth_service.decode_token(token)
+
+        if token_data is None:
+            raise InvalidToken("No data found in access token")
+
+        if token_data.get("refresh", False):
+            raise InvalidToken("Please provide a valid access token, not a refresh token")
+
+        return token_data
+
+    def token_valid(self, token: str) -> bool:
+        try:
+            token_data = auth_service.decode_token(token)
+            return token_data is not None
+        except Exception:
+            return False
+
+class AccessTokenBearer(TokenService):
+    def verify_token_data(self, token_data:dict):
+        if token_data and token_data.get("refresh", False):
+            raise InvalidToken("Please provide a valid access token, not a refresh token")
+        
+class RefreshTokenBearer(TokenService):
+    def verify_token_data(self, token_data:dict):
+        if token_data and not token_data.get("refresh", False):
+            raise InvalidToken("Please provide a valid refresh token")
+        
+        

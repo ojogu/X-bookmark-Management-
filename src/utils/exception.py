@@ -12,6 +12,7 @@ from src.v1.base.exception import (
     Environment_Variable_Exception,
     InUseError,
     TokenExpired,
+    InvalidToken,
     NotFoundError,
     AlreadyExistsError,
     InvalidEmailPassword,
@@ -80,6 +81,20 @@ def register_error_handlers(app: FastAPI):
                 "status": "error",
                 "message": "Resource already in use",
                 "error_code": "resource_in_use",
+                "data": None,
+                "role": None
+            }
+        )
+    )
+    
+    app.add_exception_handler(
+        InvalidToken,
+        create_exception_handler(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            initial_detail={
+                "status": "error",
+                "message": "Invalid token",
+                "error_code": "access or refresh token invalid",
                 "data": None,
                 "role": None
             }
