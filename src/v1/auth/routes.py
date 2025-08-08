@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.responses import RedirectResponse
 import httpx
 from .schema import Webhook
@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
 from src.utils.config import config
 from urllib.parse import urlencode
+from src.v1.auth.service import RefreshTokenBearer, auth_service
+from datetime import datetime
 auth_router = APIRouter(prefix="/auth")
 logger = setup_logger(__name__, file_path="auth.log")
 
@@ -103,3 +105,15 @@ async def handle_callback(
         )
 
 
+@auth_router.get("/refresh-token")
+async def get_new_access_token(token_details:dict = Depends(RefreshTokenBearer())):
+    expiry_timestamp = token_details["exp"] 
+    if datetime.fromtimestamp(expiry_timestamp) > datetime.now():
+        new_access_token = auth_service.create_access_token(
+            user_data=token_details["user"]
+        )
+        return JSONResponse(
+            content={
+                "access_token": new_access_token
+            }
+        )

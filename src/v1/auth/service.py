@@ -110,11 +110,13 @@ class TokenService(HTTPBearer):
         # Step 3: Decode token
         token_data = auth_service.decode_token(token)
 
+        self.verify_token_data(token_data)
+        
         if token_data is None:
             raise InvalidToken("No data found in access token")
 
-        if token_data.get("refresh", False):
-            raise InvalidToken("Please provide a valid access token, not a refresh token")
+        # if token_data.get("refresh", False):
+        #     raise InvalidToken("Please provide a valid access token, not a refresh token")
 
         return token_data
 
@@ -124,15 +126,34 @@ class TokenService(HTTPBearer):
             return token_data is not None
         except Exception:
             return False
+        
+    def verify_token_data(self, token_data:dict):
+        raise NotImplementedError("Overide in the child classes ")
 
 class AccessTokenBearer(TokenService):
     def verify_token_data(self, token_data:dict):
+        """
+        Verifies that the token data is a valid access token.
+
+        Args:
+            token_data (dict): The decoded token data.
+
+        Raises:
+            InvalidToken: If the token is a refresh token.
+        """
         if token_data and token_data.get("refresh", False):
             raise InvalidToken("Please provide a valid access token, not a refresh token")
         
 class RefreshTokenBearer(TokenService):
     def verify_token_data(self, token_data:dict):
+        """
+        Verifies that the token data is a valid refresh token.
+
+        Args:
+            token_data (dict): The decoded token data.
+
+        Raises:
+            InvalidToken: If the token is an access token.
+        """
         if token_data and not token_data.get("refresh", False):
             raise InvalidToken("Please provide a valid refresh token")
-        
-        
