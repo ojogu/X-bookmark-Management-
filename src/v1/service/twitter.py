@@ -326,59 +326,101 @@ class TwitterService:
 
     # BOOKMARK METHODS
 
-    async def get_bookmarks(self, access_token: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    async def get_bookmarks(self, access_token: str, user_id: str, x_id: int, max_results: int = 10):
         """Get user's bookmarks - returns list of clean tweet objects with author info"""
         try:
+            logger.info(f"Fetching bookmarks for user_id: {user_id}")
             params = {
                 'tweet.fields': 'id,text,author_id,created_at,public_metrics,context_annotations,conversation_id,in_reply_to_user_id,lang,possibly_sensitive,reply_settings,source',
                 'expansions': 'author_id',
                 'user.fields': 'id,name,username,profile_image_url',
                 'max_results': min(max_results, 100)
             }
+
+            # Correct endpoint
+            endpoint = f"/users/{x_id}/bookmarks"
+            logger.info(f"url: {endpoint}")
+            response = await self._make_request(access_token, 'GET', endpoint, params=params)
             
-            response = await self._make_request(access_token, 'GET', '/users/me/bookmarks', params=params)
             tweets_data = response.get('data', [])
-            
-            # Get author info from includes
-            authors = {}
-            if 'includes' in response and 'users' in response['includes']:
-                authors = {user['id']: user for user in response['includes']['users']}
-            
+            authors = {u['id']: u for u in response.get('includes', {}).get('users', [])}
+
             bookmarks = []
-            for tweet_data in tweets_data:
-                author = authors.get(tweet_data['author_id'])
-                
-                bookmark_info = {
-                    "id": tweet_data['id'],
-                    "text": tweet_data['text'],
-                    "author_id": tweet_data['author_id'],
+            for tweet in tweets_data:
+                author = authors.get(tweet['author_id'])
+                bookmarks.append({
+                    "id": tweet['id'],
+                    "text": tweet['text'],
                     "author": {
-                        "id": author['id'] if author else tweet_data['author_id'],
-                        "username": author.get('username', '') if author else '',
-                        "name": author.get('name', '') if author else '',
-                        "profile_image_url": author.get('profile_image_url') if author else None
+                        "id": author['id'],
+                        "username": author['username'],
+                        "name": author['name'],
+                        "profile_image_url": author['profile_image_url']
                     } if author else None,
-                    "created_at": tweet_data.get('created_at'),
-                    "like_count": tweet_data.get('public_metrics', {}).get('like_count', 0),
-                    "retweet_count": tweet_data.get('public_metrics', {}).get('retweet_count', 0),
-                    "reply_count": tweet_data.get('public_metrics', {}).get('reply_count', 0),
-                    "quote_count": tweet_data.get('public_metrics', {}).get('quote_count', 0),
-                    "conversation_id": tweet_data.get('conversation_id'),
-                    "in_reply_to_user_id": tweet_data.get('in_reply_to_user_id'),
-                    "lang": tweet_data.get('lang'),
-                    "possibly_sensitive": tweet_data.get('possibly_sensitive', False),
-                    "reply_settings": tweet_data.get('reply_settings'),
-                    "source": tweet_data.get('source')
-                }
-                bookmarks.append(bookmark_info)
-            
+                    "created_at": tweet.get('created_at'),
+                    "metrics": tweet.get('public_metrics', {}),
+                    "lang": tweet.get('lang'),
+                    "possibly_sensitive": tweet.get('possibly_sensitive', False),
+                })
+            logger.info(f"Successfully fetched {len(bookmarks)} bookmarks for user_id: {user_id}")
+            logger.info(f"bookmarks for user{user_id}: {bookmarks}")
             return bookmarks
-            
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to get bookmarks for user_id {user_id}: {e}", exc_info=True)
             raise
 
-    # LIKE METHODS
+            
 
+    async def create_bookmark(self, access_token: str, user_id: str, x_id: int, tweet_id: str):
+        """Create a bookmark for a tweet"""
+        try:
+            logger.info(f"Creating bookmark for tweet_id: {tweet_id} for user_id: {user_id}")
+
+            endpoint = f"/users/{x_id}/bookmarks"
+            payload = {"tweet_id": tweet_id}
+
+            response = await self._make_request(
+                access_token,
+                method='POST',
+                endpoint=endpoint,
+                json_data=payload,  # assuming your _make_request supports this
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "BookmarksSampleCode"
+                }
+            )
+
+            logger.info(f"Bookmark creation response: {response}")
+            return response
+        except Exception as e:
+            logger.error(f"Failed to create bookmark for user_id {user_id}, tweet_id {tweet_id}: {e}", exc_info=True)
+            raise
+
+    async def delete_bookmark(self, access_token: str, user_id: str, x_id: int, tweet_id: str):
+        """Delete a bookmark for a tweet"""
+        try:
+            logger.info(f"Deleting bookmark for tweet_id: {tweet_id} for user_id: {user_id}")
+
+            endpoint = f"/users/{x_id}/bookmarks/{tweet_id}"
+
+            response = await self._make_request(
+                access_token,
+                method='DELETE',
+                endpoint=endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "BookmarksSampleCode"
+                }
+            )
+
+            logger.info(f"Bookmark deletion response: {response}")
+            return response
+        except Exception as e:
+            logger.error(f"Failed to delete bookmark for user_id {user_id}, tweet_id {tweet_id}: {e}", exc_info=True)
+            raise
+        
+        
+    # LIKE METHODS
     async def like_tweet(self, access_token: str, tweet_id: str) -> bool:
         """Like a tweet - returns success status"""
         try:
