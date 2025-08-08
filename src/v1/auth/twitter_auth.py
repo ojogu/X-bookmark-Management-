@@ -256,6 +256,7 @@ class TwitterAuthService:
                     if response.status == 200:
                         token_response = await response.json()
                         logger.info("Successfully refreshed access token")
+                        logger.info(f"new tokens: {token_response}")
                         return token_response
                     else:
                         error_text = await response.text()

@@ -28,6 +28,11 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """
     async with async_session() as session:
         yield session
+        
+# for manual use (not in fastapi Dependency injection, normal class/func injection)
+async def get_manual_db_session() -> AsyncSession:
+    async with async_session() as session:
+        return session
 
 
 async def init_db():

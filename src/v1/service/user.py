@@ -2,6 +2,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
+from datetime import datetime, timedelta, timezone 
+from src.v1.schemas.user import User_Token
 from src.v1.base.exception import (
     Environment_Variable_Exception,
     InUseError,
@@ -21,10 +23,52 @@ from src.v1.base.exception import (
 from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
+
+def convert_expires_in_to_datetime(token_dict: dict) -> dict:
+    """
+    Convert 'expires_in' seconds to 'expires_at' datetime in a token dictionary.
+    
+    Args:
+        token_dict (dict): Dictionary containing token data with 'expires_in' field
+        
+    Returns:
+        dict: Updated dictionary with 'expires_at' datetime and 'expires_in' removed
+        
+    Raises:
+        KeyError: If 'expires_in' key is not found in the dictionary
+        ValueError: If 'expires_in' cannot be converted to integer
+    """
+    # Create a copy to avoid mutating the original dict
+    updated_dict = token_dict.copy()
+    
+    if 'expires_in' not in updated_dict:
+        raise KeyError("'expires_in' key not found in token dictionary")
+    
+    try:
+        expires_in_seconds = int(updated_dict["expires_in"])
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Cannot convert 'expires_in' to integer: {updated_dict['expires_in']}") from e
+    
+    # Convert to datetime using the same logic as your helper method
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
+    
+    # Inject into the dict for DB persistence
+    updated_dict["expires_at"] = expires_at
+    
+    logger.info(f"Successfully converted {expires_in_seconds} to a datetime object {expires_at}, deleting.....")
+    
+    # Remove the original field as it's no longer needed
+    del updated_dict["expires_in"]
+    
+    return updated_dict
+
+
+
 class UserService():
     def __init__(self, db:AsyncSession):
         self.db = db
     
+
     async def create_user(self, user_data: dict):
         x_id = user_data["x_id"]
         logger.info(f"Attempting to create user with x_id: {x_id}")
@@ -65,6 +109,9 @@ class UserService():
 
 
     async def store_user_token(self, user_id: str, user_token: dict):
+        logger.info(f"user tokens: {user_token}")
+        updated_user_tokens = convert_expires_in_to_datetime(user_token)
+        logger.info(f"updated user tokens: {updated_user_tokens}")
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:
             raise NotFoundError("User id not found, register")
@@ -73,15 +120,15 @@ class UserService():
             sa.select(UserToken).where(UserToken.user_id == user_id)
         )
         existing_token = result.scalar_one_or_none()
-
+        logger.info(f"existing tokens: {existing_token}")
         if existing_token:
-            logger.info(f"Found existing token for user {user_id}, updating....")
-            for key, value in user_token.items():
+            logger.info(f"Found existing token for user {user_id}")
+            for key, value in updated_user_tokens.items():
                 setattr(existing_token, key, value)
             user_tokens = existing_token
         else:
             logger.info(f"No existing token for user {user_id}, creating new one.")
-            user_tokens = UserToken(user_id=user_id, **user_token)
+            user_tokens = UserToken(user_id=user_id, **updated_user_tokens)
             self.db.add(user_tokens)
 
         try:
@@ -111,7 +158,7 @@ class UserService():
         if not result:
             return None
         return result.scalar_one_or_none() 
-        # return True if result.scalar_one_or_none() else False
+
     
     async def check_if_user_exists_user_id(self, user_id:str):
         result = await self.db.execute(sa.select(User).where(User.id == user_id))
@@ -125,12 +172,22 @@ class UserService():
         return result.scalar_one_or_none()
     
     async def is_token_expired(self, user_id):
-        result = await self.db.execute(
-            sa.select(UserToken).where(
-                sa.and_(
-                    UserToken.user_id == user_id,
-                    UserToken.is_expired == True
+        logger.info(f"Checking if token is expired for user_id: {user_id}")
+        try:
+            result = await self.db.execute(
+                sa.select(UserToken).where(
+                    sa.and_(
+                        UserToken.user_id == user_id,
+                        UserToken.is_expired == True
+                    )
                 )
             )
-        )
-        return True if result.scalar_one_or_none() else False 
+            token_is_expired = result.scalar_one_or_none() is not None
+            if token_is_expired:
+                logger.info(f"Token for user_id: {user_id} has expired.")
+            else:
+                logger.info(f"Token for user_id: {user_id} has not expired.")
+            return token_is_expired
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while checking token expiration for user {user_id}: {e}", exc_info=True)
+            raise ServerError(f"Could not check token expiration: {e}") from e

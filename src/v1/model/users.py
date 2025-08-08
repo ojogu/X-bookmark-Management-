@@ -24,13 +24,16 @@ class UserToken(BaseModel):
     expires_at = sa.Column(sa.DateTime(timezone=True))
     user = relationship("User", back_populates="token")
     
-@hybrid_property
-def is_expired(self):
-    """Returns True if the current time is past the expiration time."""
-    return self.expires_at and datetime.now(tz=timezone.utc) > self.expires_at
+    @hybrid_property
+    def is_expired(self):
+        """Returns True if the current time is past the expiration time."""
+        return True if self.expires_at and datetime.now(tz=timezone.utc) > self.expires_at else False
 
 
-@is_expired.expression
-def is_expired(cls):
-    """SQL expression to check if the row is expired."""
-    return cls.expires_at != None and sa.func.now() > cls.expires_at
+    @is_expired.expression
+    def is_expired(cls):
+        """SQL expression to check if the row is expired."""
+        return sa.and_(
+            cls.expires_at.isnot(None),
+            sa.func.timezone('UTC', sa.func.now()) > cls.expires_at
+        )

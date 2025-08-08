@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 
@@ -32,6 +32,7 @@ class UserCreate(BaseModel):
 
 
 class User_Token(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     token_type: str
     expires_in: int
     access_token: str
