@@ -7,7 +7,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 class User(BaseModel):
     __tablename__ = "users"
-    x_id = sa.Column(sa.String, nullable=False)
+    x_id = sa.Column(sa.String, nullable=False, unique=True)
     profile_image_url = sa.Column(sa.String, nullable=False)
     name = sa.Column(sa.String, nullable=False)
     username = sa.Column(sa.String, unique=True, nullable=False)

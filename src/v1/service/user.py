@@ -24,44 +24,36 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
 
-def convert_expires_in_to_datetime(token_dict: dict) -> dict:
+def normalize_token_expiry(token_dict: dict) -> dict:
     """
-    Convert 'expires_in' seconds to 'expires_at' datetime in a token dictionary.
-    
-    Args:
-        token_dict (dict): Dictionary containing token data with 'expires_in' field
-        
-    Returns:
-        dict: Updated dictionary with 'expires_at' datetime and 'expires_in' removed
-        
-    Raises:
-        KeyError: If 'expires_in' key is not found in the dictionary
-        ValueError: If 'expires_in' cannot be converted to integer
+    Normalize token expiry so that token_dict always has `expires_at` (datetime in UTC).
+    Handles both 'expires_in' (seconds) and 'expires_at' (timestamp or datetime).
     """
-    # Create a copy to avoid mutating the original dict
     updated_dict = token_dict.copy()
-    
-    if 'expires_in' not in updated_dict:
-        raise KeyError("'expires_in' key not found in token dictionary")
-    
-    try:
-        expires_in_seconds = int(updated_dict["expires_in"])
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Cannot convert 'expires_in' to integer: {updated_dict['expires_in']}") from e
-    
-    # Convert to datetime using the same logic as your helper method
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
-    
-    # Inject into the dict for DB persistence
-    updated_dict["expires_at"] = expires_at
-    
-    logger.info(f"Successfully converted {expires_in_seconds} to a datetime object {expires_at}, deleting.....")
-    
-    # Remove the original field as it's no longer needed
-    del updated_dict["expires_in"]
-    
-    return updated_dict
 
+    if "expires_at" in updated_dict:
+        expires_at_val = updated_dict["expires_at"]
+        if isinstance(expires_at_val, datetime):
+            # Already a datetime
+            expires_at = expires_at_val
+        else:
+            try:
+                # Try parsing string to datetime (if provider sends ISO format)
+                expires_at = datetime.fromisoformat(str(expires_at_val))
+            except ValueError:
+                raise ValueError(f"Unrecognized expires_at format: {expires_at_val}")
+    elif "expires_in" in updated_dict:
+        try:
+            expires_in_seconds = int(updated_dict["expires_in"])
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Cannot convert 'expires_in' to integer: {updated_dict['expires_in']}") from e
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
+        del updated_dict["expires_in"]
+    else:
+        raise KeyError("No 'expires_in' or 'expires_at' key found in token dictionary")
+
+    updated_dict["expires_at"] = expires_at
+    return updated_dict
 
 
 class UserService():
@@ -110,7 +102,7 @@ class UserService():
 
     async def store_user_token(self, user_id: str, user_token: dict):
         logger.info(f"user tokens: {user_token}")
-        updated_user_tokens = convert_expires_in_to_datetime(user_token)
+        updated_user_tokens = normalize_token_expiry(user_token)
         logger.info(f"updated user tokens: {updated_user_tokens}")
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:

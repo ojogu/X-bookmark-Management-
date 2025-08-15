@@ -9,7 +9,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 
 
-def setup_logger(name: str, file_path: str, level=logging.INFO) -> logging.Logger:
+def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> logging.Logger:
     """
     Sets up a logger with:
     - File logging (plain text, no color)
