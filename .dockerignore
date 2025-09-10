@@ -1,4 +1,7 @@
-# Python-generated files
+# Ignore VCS
+.git
+.gitignore
+
 __pycache__/
 *.py[oc]
 build/
@@ -8,10 +11,8 @@ wheels/
 
 # Virtual environments
 /env
-/readmes
 
 .env
 /logs
 dump.rdb
 tasks.txt
-frontend.py

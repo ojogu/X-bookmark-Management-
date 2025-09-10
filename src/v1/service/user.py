@@ -163,6 +163,15 @@ class UserService():
         )
         return result.scalar_one_or_none()
     
+    # async def fetch_user_id(self, user_id):
+    #     result = await self.db.execute(
+    #         sa.select(User.id).
+    #         where(
+    #             User.id == user_id
+    #         )
+    #     )
+    #     return result.scalar_one_or_none()
+    
     async def is_token_expired(self, user_id):
         logger.info(f"Checking if token is expired for user_id: {user_id}")
         try:
@@ -183,3 +192,26 @@ class UserService():
         except SQLAlchemyError as e:
             logger.error(f"Database error while checking token expiration for user {user_id}: {e}", exc_info=True)
             raise ServerError(f"Could not check token expiration: {e}") from e
+
+
+    async def fetch_all_users_id(self):
+        stmt = await self.db.execute(
+            sa.select(
+                User.id
+            )
+        )
+        return stmt.scalars().all() #scalars return multiple rows, but only the first column/object from each row.
+    
+    # async def fetch_X_id_for_a_user(self, user_id:str):
+    #     # user_id = await self.check_if_user_exists_user_id(user_id)
+    #     stmt = (
+    #         sa.select(User.x_id)
+    #         .join(UserToken, User.id == UserToken.user_id)
+    #         .where(User.id == user_id)   # use the checked user_id here
+    #     )
+    #     result = await self.db.execute(stmt)
+    #     return result.scalar_one_or_none()
+    
+    async def fetch_X_id_for_a_user(self, user_id: str):
+        user = await self.check_if_user_exists_user_id(user_id)
+        return user.x_id

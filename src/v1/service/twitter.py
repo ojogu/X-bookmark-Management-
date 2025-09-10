@@ -1,3 +1,5 @@
+import asyncio
+import time
 import aiohttp
 from src.utils.log import setup_logger
 from typing import Dict, List, Any, Optional
@@ -13,7 +15,7 @@ class TwitterService:
         self.base_url = "https://api.twitter.com/2"
 
     async def _make_request(self, access_token: str, method: str, endpoint: str, 
-                           params: Dict = None, data: Dict = None) -> Dict[str, Any]:
+    params: Dict = None, data: Dict = None) -> Dict[str, Any]:
         """Make HTTP request to Twitter API"""
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -26,6 +28,26 @@ class TwitterService:
             async with aiohttp.ClientSession() as session:
                 if method.upper() == 'GET':
                     async with session.get(url, headers=headers, params=params) as response:
+                        headers = response.headers
+                        logger.info(f"X headers: {headers}")
+                            # Always get the response body first
+                        try:
+                            response_json = await response.json()
+                            logger.info(f"Response JSON: {response_json}")
+                        except:
+                            response_text = await response.text()
+                            logger.info(f"Response text: {response_text}")
+    
+                        #check for 429 error code, handle approprately
+                        if response.status == 429:
+                            logger.info(f"response; {response}")
+                            reset_time = int(response.headers.get("x-rate-limit-reset", time.time() ))
+                            sleep_for = reset_time - int(time.time()) 
+                            sleep_for_min = sleep_for / 60
+                            logger.info(f"Rate limit hit. Sleeping for {sleep_for_min:.2f} minutes...")
+                            raise ValueError("rate limiting reach")
+                            # await asyncio.sleep(max(sleep_for, 1))
+
                         response.raise_for_status()
                         return await response.json()
                 elif method.upper() == 'POST':
@@ -140,7 +162,7 @@ class TwitterService:
             raise
 
     async def get_multiple_users(self, access_token: str, usernames: List[str] = None, 
-                                user_ids: List[str] = None) -> List[Dict[str, Any]]:
+    user_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Get multiple users by usernames or IDs - returns list of clean user objects"""
         try:
             params = {
@@ -229,7 +251,7 @@ class TwitterService:
             raise
 
     async def get_user_tweets(self, access_token: str, user_id: str, max_results: int = 10,
-                             exclude_retweets: bool = False, exclude_replies: bool = False) -> List[Dict[str, Any]]:
+    exclude_retweets: bool = False, exclude_replies: bool = False) -> List[Dict[str, Any]]:
         """Get user's tweets - returns list of clean tweet objects"""
         try:
             params = {
@@ -325,23 +347,39 @@ class TwitterService:
             raise
 
     # BOOKMARK METHODS
-
     async def get_bookmarks(self, access_token: str, user_id: str, x_id: int, max_results: int = 10):
         """Get user's bookmarks - returns list of clean tweet objects with author info"""
         try:
             logger.info(f"Fetching bookmarks for user_id: {user_id}")
+
             params = {
-                'tweet.fields': 'id,text,author_id,created_at,public_metrics,context_annotations,conversation_id,in_reply_to_user_id,lang,possibly_sensitive,reply_settings,source',
-                'expansions': 'author_id',
-                'user.fields': 'id,name,username,profile_image_url',
-                'max_results': min(max_results, 100)
+                # Tweet object fields you want to return
+                "tweet.fields": (
+                    "id,text,author_id,created_at,public_metrics,"       # core tweet info + metrics
+                    "conversation_id,in_reply_to_user_id,"               # thread/reply context
+                    "lang,possibly_sensitive,reply_settings,source,"     # metadata about tweet
+                    "entities,attachments"                               # external links + media refs
+                ),
+
+                # Expansions to include related objects
+                "expansions": "author_id,attachments.media_keys",        # expand user info + media objects
+
+                # User object fields to return when expanding author_id
+                "user.fields": "id,name,username,profile_image_url",     # basic user profile info
+
+                # Media object fields to return when expanding attachments.media_keys
+                "media.fields": "media_key,type,url,preview_image_url,alt_text",
+                # direct media link + preview + accessibility text,
+                
+                'max_results': min(max_results, 400)
             }
+
 
             # Correct endpoint
             endpoint = f"/users/{x_id}/bookmarks"
             logger.info(f"url: {endpoint}")
             response = await self._make_request(access_token, 'GET', endpoint, params=params)
-            
+            # logger.info(f"header from X: {response.header}")
             tweets_data = response.get('data', [])
             authors = {u['id']: u for u in response.get('includes', {}).get('users', [])}
 

@@ -12,7 +12,21 @@ from src.utils.db import get_session
 from src.utils.config import config
 from urllib.parse import urlencode
 from src.v1.service.bookmark import BookmarkService
-
+from src.v1.base.exception import (
+    Environment_Variable_Exception,
+    InUseError,
+    TokenExpired,
+    NotFoundError,
+    AlreadyExistsError,
+    InvalidEmailPassword,
+    BadRequest,
+    NotVerified,
+    EmailVerificationError,
+    ServerError,
+    NotActive, 
+    BaseExceptionClass
+    
+)
 access_token_bearer = AccessTokenBearer()
 logger = setup_logger(__name__, file_path="auth.log")
 
@@ -40,32 +54,47 @@ def get_bookmark_service(user_service: UserService = Depends(get_user_service)):
     Returns:
         BookmarkService: An instance of the BookmarkService service.
     """
-    return BookmarkService(user_service)
+    return BookmarkService(user_service=user_service)
 
 
 @twitter_router.get("/user-info")
 async def get_user_info(
-    user_details:AccessTokenBearer = Depends(access_token_bearer)
-    ):
+    user_details:AccessTokenBearer = Depends(access_token_bearer),
+    db: AsyncSession = Depends(get_session)):
     # logger.info(f"user details: {user_details}")
-    user_id = user_details["user"]["user_id"]
-    access_token = await get_valid_tokens(user_id)
-    user_info = await twitter_service.get_user_info(access_token)
-    return user_info
+    try:
+        user_id = user_details["user"]["user_id"]
+        tokens = await get_valid_tokens(user_id, db)
+        access_token = tokens.get("access_token")
+        user_info = await twitter_service.get_user_info(access_token)
+        return user_info
+    except Exception as e:
+        logger.error(f"Error getting user info: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @twitter_router.get("/bookmarks")
 async def get_bookmarks(
-    user_details: AccessTokenBearer = Depends(access_token_bearer), max_results: int = 10, bookmark_service:BookmarkService = Depends(get_bookmark_service)
+    max_results: int = 50, #query parameter 
+    user_details: AccessTokenBearer = Depends(access_token_bearer), bookmark_service:BookmarkService = Depends(get_bookmark_service),
+    db: AsyncSession = Depends(get_session)
     ):
     
-    user_id = user_details["user"]["user_id"]
-    x_id = user_details["user"]["x_id"]
-    access_token = await get_valid_tokens(user_id)
-    bookmarks = await bookmark_service.create_bookmark(
-        max_results,
-        access_token=access_token, 
-        user_id = user_id,
-        x_id = x_id,
-        )
-    return bookmarks
+    try:
+        user_id = user_details["user"]["user_id"]
+        x_id = user_details["user"]["x_id"]
+        #TODO: fetch from db, not direct api
+        tokens = await get_valid_tokens(user_id, db)
+        access_token = tokens.get("access_token")
+        bookmarks = await bookmark_service.fetch_store_bookmark(
+            access_token=access_token, 
+            user_id = user_id,
+            x_id = x_id,
+            max_results = max_results,
+            )
+        return bookmarks
+    except NotFoundError as e:
+        logger.error(e)
+    except Exception as e:
+        logger.error(f"Error getting bookmarks: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")

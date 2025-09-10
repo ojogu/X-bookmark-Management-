@@ -36,6 +36,9 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def get_manual_db_session() -> AsyncSession:
     async with async_session() as session:
         return session
+    
+async def get_db_session_no_context() -> AsyncSession:
+        return async_session()
 
 
 async def init_db():

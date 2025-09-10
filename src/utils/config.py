@@ -9,13 +9,13 @@ class Config(BaseSettings):
     api_key: str
     api_secret: str
     redirect_uri:str 
-    redis_host: str
-    redis_port:int
+    redis_url: str
     jwt_secret_key:str
     jwt_algo:str 
     access_token_expiry:int
     refresh_token_expiry:int
     frontend_url:str
+    celery_beat_interval:int
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
@@ -29,4 +29,3 @@ class Settings:
     PROJECT_NAME: str = "Xmarks"
     PROJECT_VERSION: str = "0.0.1"
     PROJECT_DESCRIPTION: str = "API for Xmarks; the ultimate premium bookmark managment system for X (former twitter)"
-    

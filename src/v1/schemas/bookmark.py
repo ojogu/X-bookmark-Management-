@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class AuthorSchema(BaseModel):
@@ -24,3 +24,6 @@ class BookmarkSchema(BaseModel):
     # metrics: Optional[MetricsSchema] = None
     lang: Optional[str] = None
     possibly_sensitive: bool = False
+
+class ListBookmarkSchema(BaseModel):
+    bookmarks: List[BookmarkSchema]
