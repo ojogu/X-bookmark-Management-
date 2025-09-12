@@ -5,10 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "asgiref>=3.9.1",
     "asyncpg>=0.30.0",
     "bcrypt>=4.3.0",
     "fastapi[all]>=0.115.12",
     "flower>=2.0.1",
+    "gevent>=25.8.2",
     "sqlalchemy>=2.0.40",
     "tweepy[async]>=4.15.0",
 ]

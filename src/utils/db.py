@@ -7,38 +7,74 @@ from .config import config
 from sqlalchemy.exc import SQLAlchemyError
 from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="error.log")
+from contextlib import asynccontextmanager
+
 
 engine = create_async_engine(url= config.DATABASE_URL)
 
 async_session = async_sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
 )
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Creates and yields an asynchronous database session.
 
-    This function is an asynchronous generator that creates a new database session
-    using the async_session factory and yields it. The session is automatically
-    closed when the generator is exhausted or the context is exited.
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
+
+@asynccontextmanager
+async def get_async_db_session():
+    """
+    Get an async database session for use in background tasks.
 
     Yields:
-        AsyncSession: An asynchronous SQLAlchemy session object.
-
-    Usage:
-        async for session in get_session():
-            # Use the session for database operations
-            ...
+        AsyncSession: Database session
     """
-    async with async_session() as session:
-        yield session
-        
-# for manual use (not in fastapi Dependency injection, normal class/func injection)
-async def get_manual_db_session() -> AsyncSession:
-    async with async_session() as session:
-        return session
-    
-async def get_db_session_no_context() -> AsyncSession:
-        return async_session()
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Database session error: {e}")
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+# Create async engine
+engine = create_async_engine(
+    url=config.DATABASE_URL,
+    # echo=settings.debug,
+    poolclass=NullPool,  # Use NullPool for async operations
+    future=True,
+)
+
+# Create async session factory
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency function to get database session.
+
+    Yields:
+        AsyncSession: Database session
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Database session error: {e}")
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
 
 
 async def init_db():
@@ -73,4 +109,3 @@ async def drop_db():
     async with engine.begin() as conn:
         # Use run_sync to call the synchronous drop_all method in an async context
         await conn.run_sync(Base.metadata.drop_all)
-

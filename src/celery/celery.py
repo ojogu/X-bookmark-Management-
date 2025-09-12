@@ -8,6 +8,16 @@ bg_task = Celery(
     include=["src.celery.task"]
 )
 
+bg_task.conf.update(
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json',
+    timezone='UTC',
+    enable_utc=True,
+    # Important for async tasks
+    task_always_eager=False,
+)
+
 bg_task.config_from_object(CeleryConfig)
 interval = config.celery_beat_interval
 #configure celery beat

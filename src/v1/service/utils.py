@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from src.utils.log import setup_logger
 from src.v1.service.user import UserService
-from src.utils.db import get_manual_db_session
+# from src.utils.db import get_manual_db_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.auth.twitter_auth import TwitterAuthService
 

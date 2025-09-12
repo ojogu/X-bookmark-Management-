@@ -24,7 +24,7 @@ async def login_page():
     # Call your backend to get OAuth URL
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get("http://localhost:8000/auth/login")
+            response = await client.get("https://cd4c6cfd3200.ngrok-free.app/auth/login")
             data = response.json()
             oauth_url = data.get("url")
             
@@ -102,7 +102,7 @@ async def dashboard(request: Request):
                 
                 async function makeApiCall() {{
                     try {{
-                        const response = await fetch('http://localhost:8000/api/user-data', {{
+                        const response = await fetch('https://cd4c6cfd3200.ngrok-free.app/api/user-data', {{
                             headers: {{
                                 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token')
                             }}
