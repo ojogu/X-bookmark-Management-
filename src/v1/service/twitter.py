@@ -1,4 +1,4 @@
-import asyncio
+from src.v1.service.bookmark import BookmarkService
 import time
 import aiohttp
 from src.utils.log import setup_logger
@@ -29,11 +29,11 @@ class TwitterService:
                 if method.upper() == 'GET':
                     async with session.get(url, headers=headers, params=params) as response:
                         headers = response.headers
-                        logger.info(f"X headers: {headers}")
+                        # logger.info(f"X headers: {headers}")
                             # Always get the response body first
                         try:
                             response_json = await response.json()
-                            logger.info(f"Response JSON: {response_json}")
+                            logger.info(f"Response JSON found")
                         except:
                             response_text = await response.text()
                             logger.info(f"Response text: {response_text}")
@@ -380,29 +380,10 @@ class TwitterService:
             logger.info(f"url: {endpoint}")
             response = await self._make_request(access_token, 'GET', endpoint, params=params)
             # logger.info(f"header from X: {response.header}")
-            tweets_data = response.get('data', [])
-            authors = {u['id']: u for u in response.get('includes', {}).get('users', [])}
-
-            bookmarks = []
-            for tweet in tweets_data:
-                author = authors.get(tweet['author_id'])
-                bookmarks.append({
-                    "id": tweet['id'],
-                    "text": tweet['text'],
-                    "author": {
-                        "id": author['id'],
-                        "username": author['username'],
-                        "name": author['name'],
-                        "profile_image_url": author['profile_image_url']
-                    } if author else None,
-                    "created_at": tweet.get('created_at'),
-                    "metrics": tweet.get('public_metrics', {}),
-                    "lang": tweet.get('lang'),
-                    "possibly_sensitive": tweet.get('possibly_sensitive', False),
-                })
-            logger.info(f"Successfully fetched {len(bookmarks)} bookmarks for user_id: {user_id}")
-            logger.info(f"bookmarks for user{user_id}: {bookmarks}")
-            return bookmarks
+            # logger.info(f"full response: {response}")
+            cleaned = BookmarkService.parse_bookmarks(response, user_id)
+            logger.info(f"Fetched {len(cleaned['bookmarks'])} bookmarks, meta: {cleaned['meta']}")
+            return cleaned #both bookmark and meta
         except Exception as e:
             logger.error(f"Failed to get bookmarks for user_id {user_id}: {e}", exc_info=True)
             raise

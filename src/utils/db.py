@@ -6,25 +6,28 @@ from src.v1 import model
 from .config import config
 from sqlalchemy.exc import SQLAlchemyError
 from src.utils.log import setup_logger
+from sqlalchemy.pool import NullPool
 logger = setup_logger(__name__, file_path="error.log")
 from contextlib import asynccontextmanager
 
 
-engine = create_async_engine(url= config.DATABASE_URL)
+# Create async engine
+engine = create_async_engine(
+    url=config.DATABASE_URL,
+    # echo=settings.debug,
+    poolclass=NullPool,  # Use NullPool for async operations
+    future=True,
+)
+
 
 async_session = async_sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
 )
 
-import logging
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 
 @asynccontextmanager
+#this helps in a way that, each internal async function in the bg task gets a new session, which prevent event loop or connection issue, coupled with the poolclass=NullPool param when creating the engine, it opens a new connection 
 async def get_async_db_session():
     """
     Get an async database session for use in background tasks.
@@ -32,7 +35,7 @@ async def get_async_db_session():
     Yields:
         AsyncSession: Database session
     """
-    async with AsyncSessionLocal() as session:
+    async with async_session() as session:
         try:
             yield session
             await session.commit()
@@ -43,18 +46,11 @@ async def get_async_db_session():
         finally:
             await session.close()
 
-# Create async engine
-engine = create_async_engine(
-    url=config.DATABASE_URL,
-    # echo=settings.debug,
-    poolclass=NullPool,  # Use NullPool for async operations
-    future=True,
-)
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+# # Create async session factory
+# AsyncSessionLocal = async_sessionmaker(
+#     engine, class_=AsyncSession, expire_on_commit=False
+# )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -64,7 +60,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession: Database session
     """
-    async with AsyncSessionLocal() as session:
+    async with async_session() as session:
         try:
             yield session
             await session.commit()

@@ -26,7 +26,6 @@ twitter_service = TwitterService()
 logger = setup_logger(__name__, file_path="bg_tasks.log")
 
 
-
 def run_async_in_sync(coro):
     """
     Helper function to run async code in sync Celery tasks
