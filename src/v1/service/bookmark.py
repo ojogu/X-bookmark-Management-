@@ -7,7 +7,7 @@ from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
 from src.v1.service.user import UserService
 from datetime import datetime, timedelta, timezone 
-from src.v1.schemas.bookmark import ListBookmarkSchema
+from src.v1.schemas.bookmark import BookmarkResponse
 # from src.v1.service.twitter import twitter_service
 from src.v1.base.exception import (
     Environment_Variable_Exception,
@@ -30,29 +30,6 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
 
-def _clean_value(value):
-    """Clean strings by removing newlines/tabs and extra spaces."""
-    if isinstance(value, str):
-        return re.sub(r"\s+", " ", value).strip()
-    return value
-
-def _clean_structure(data):
-    """Recursively clean dicts/lists of strings."""
-    if isinstance(data, dict):
-        return {k: _clean_structure(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [_clean_structure(item) for item in data]
-    else:
-        return _clean_value(data)
-
-def read_json_file(path: str) -> Union[dict, list]:
-    """
-    Read a JSON file and return its content as a cleaned Python dictionary or list.
-    All strings will be stripped of newlines, tabs, and excessive spaces.
-    """
-    with open(path, "r", encoding="utf-8") as file:
-        raw_data = json.load(file)
-        return _clean_structure(raw_data)
 
 
 
@@ -98,10 +75,15 @@ class BookmarkService():
             })
         
         logger.info(f"Successfully parsed {len(bookmarks)} bookmarks for user_id: {user_id}")
-        return {
+        
+        data = {
             "bookmarks": bookmarks,
             "meta": response.get("meta", {})
         }
+        cleaned_data = _clean_structure(data)
+        validated_data = BookmarkResponse(**cleaned_data)
+        logger.info(f"final parsed bookmark for user: {user_id}: {validated_data}")
+        return validated_data
     
         # bookmarks = await twitter_service.get_bookmarks(                                                    access_token=access_token, 
         #     user_id = user_id,

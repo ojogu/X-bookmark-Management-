@@ -52,6 +52,30 @@ async def get_valid_tokens(user_id: str, db: AsyncSession):
         logger.error(f"An error occurred while getting valid tokens for user {user_id}: {e}", exc_info=True)
         return None
 
+def _clean_value(value):
+    """Clean strings by removing newlines/tabs and extra spaces."""
+    if isinstance(value, str):
+        return re.sub(r"\s+", " ", value).strip()
+    return value
+
+def _clean_structure(data):
+    """Recursively clean dicts/lists of strings."""
+    if isinstance(data, dict):
+        return {k: _clean_structure(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_clean_structure(item) for item in data]
+    else:
+        return _clean_value(data)
+
+def read_json_file(path: str) -> Union[dict, list]:
+    """
+    Read a JSON file and return its content as a cleaned Python dictionary or list.
+    All strings will be stripped of newlines, tabs, and excessive spaces.
+    """
+    with open(path, "r", encoding="utf-8") as file:
+        raw_data = json.load(file)
+        return _clean_structure(raw_data)
+
 
 # async def fetch_all_user_id_token():
 #     db = await get_manual_db_session()

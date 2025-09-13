@@ -93,6 +93,7 @@ def fetch_write_bookmark_task(self, user_id):
                     logger.warning(f"Missing access_token/x_id for user_id={user_id}. Skipping.")
                     return {"user_id": user_id, "status": "missing_credentials"}
 
+                #TODO: check for latest next token in the db, if any pass it to fetch the next post, to fetch latest post
                 bookmarks = await twitter_service.get_bookmarks(
                     access_token=access_token,
                     x_id=x_id,

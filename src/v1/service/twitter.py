@@ -40,7 +40,7 @@ class TwitterService:
     
                         #check for 429 error code, handle approprately
                         if response.status == 429:
-                            logger.info(f"response; {response}")
+                            # logger.info(f"response; {response}")
                             reset_time = int(response.headers.get("x-rate-limit-reset", time.time() ))
                             sleep_for = reset_time - int(time.time()) 
                             sleep_for_min = sleep_for / 60
@@ -347,7 +347,7 @@ class TwitterService:
             raise
 
     # BOOKMARK METHODS
-    async def get_bookmarks(self, access_token: str, user_id: str, x_id: int, max_results: int = 10):
+    async def get_bookmarks(self, access_token: str, user_id: str, x_id: int, max_results: int = 10,  pagination_token: str | None = None):
         """Get user's bookmarks - returns list of clean tweet objects with author info"""
         try:
             logger.info(f"Fetching bookmarks for user_id: {user_id}")
@@ -371,13 +371,15 @@ class TwitterService:
                 "media.fields": "media_key,type,url,preview_image_url,alt_text",
                 # direct media link + preview + accessibility text,
                 
-                'max_results': min(max_results, 400)
+                'max_results': min(max_results, 400),
             }
-
+            
+            if pagination_token:  
+                params["pagination_token"] = pagination_token
 
             # Correct endpoint
             endpoint = f"/users/{x_id}/bookmarks"
-            logger.info(f"url: {endpoint}")
+            # logger.info(f"url: {endpoint}")
             response = await self._make_request(access_token, 'GET', endpoint, params=params)
             # logger.info(f"header from X: {response.header}")
             # logger.info(f"full response: {response}")

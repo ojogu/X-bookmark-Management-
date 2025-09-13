@@ -1,29 +1,35 @@
-from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional, List
+from typing import List, Optional
+from pydantic import BaseModel, HttpUrl
 from datetime import datetime
 
-class AuthorSchema(BaseModel):
-    author_id: str = Field(..., alias="id")  # "id" in incoming JSON, "athour_id" in Python
+class Author(BaseModel):
+    id: str
     username: str
     name: str
-    profile_image_url: Optional[HttpUrl] = None
+    profile_image_url: HttpUrl
 
-# class MetricsSchema(BaseModel):
-#     retweet_count: int
-#     reply_count: int
-#     like_count: int
-#     quote_count: int
-#     bookmark_count: int
-#     impression_count: int
+class Metrics(BaseModel):
+    retweet_count: int
+    reply_count: int
+    like_count: int
+    quote_count: int
+    bookmark_count: int
+    impression_count: int
 
-class BookmarkSchema(BaseModel):
-    post_id: str =  Field(..., alias="id") 
+class Bookmark(BaseModel):
+    internal_id: str
+    id: str
     text: str
-    author: Optional[AuthorSchema] = None
-    created_at_from_twitter: Optional[datetime] = Field(alias="created_at")
-    # metrics: Optional[MetricsSchema] = None
-    lang: Optional[str] = None
-    possibly_sensitive: bool = False
+    author: Author
+    created_at: datetime
+    metrics: Metrics
+    lang: str
+    possibly_sensitive: bool
 
-class ListBookmarkSchema(BaseModel):
-    bookmarks: List[BookmarkSchema]
+class Meta(BaseModel):
+    result_count: int
+    next_token: Optional[str] = None
+
+class BookmarkResponse(BaseModel):
+    bookmarks: List[Bookmark]
+    meta: Meta
