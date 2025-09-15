@@ -22,6 +22,7 @@ class Bookmark(BaseModel):
     #relationships
     user = relationship("User", backref="bookmarks")
     post = relationship("Post", backref="bookmarks")
+    next_token = sa.Column(sa.String, unique=True)
 
 
 

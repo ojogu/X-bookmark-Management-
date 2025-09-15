@@ -9,7 +9,7 @@ from src.v1.service.twitter import TwitterService
 from src.v1.service.user import UserService 
 from src.v1.service.utils import get_valid_tokens
 from src.utils.db import get_async_db_session
-from asgiref.sync import async_to_sync
+from src.v1.service.bookmark import BookmarkService
 
 # @asynccontextmanager
 # async def get_db_session():
@@ -82,6 +82,9 @@ def fetch_write_bookmark_task(self, user_id):
         try:
             # Use your mentor's session factory
             async with get_async_db_session() as session:
+                user_service = UserService(session)
+                bookmark_service = BookmarkService(user_service)
+                
                 tokens = await get_valid_tokens(user_id, session)
                 if not tokens:
                     logger.warning(f"No valid tokens for user_id={user_id}. Skipping.")

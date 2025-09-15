@@ -78,7 +78,7 @@ class UserService():
         try:
             await self.db.flush()  # Use flush to get potential errors before commit
             await self.db.refresh(new_user) # Refresh to get DB defaults like ID, created_at
-            await self.db.commit()
+            # await self.db.commit() 
             logger.info(f"Successfully created new user with x_id: {x_id}")
             return new_user
         
@@ -126,7 +126,7 @@ class UserService():
         try:
             await self.db.flush()
             await self.db.refresh(user_tokens)
-            await self.db.commit()
+            # await self.db.commit()
             logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}")
             return user_tokens
         except IntegrityError as e:
