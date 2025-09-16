@@ -1,10 +1,18 @@
 # xfeeds API
 
 ## Overview
-xfeeds is a backend API service built with Python using the FastAPI framework. It provides a robust system for managing X (formerly Twitter) bookmarks by leveraging OAuth 2.0 for authentication and Celery for asynchronous processing of background tasks.
+xfeeds: AI-Powered X Bookmarks Manager
+xfeeds is an intelligent web application that transforms how users organize, discover, and interact with their X (formerly Twitter) bookmarks. 
+
+This is achieved through AI-powered agents that understand, categorize, and enhance bookmarked content. The backend API service is built with Python using the FastAPI framework, leveraging OAuth 2.0 for secure authentication and Celery for efficient asynchronous processing of background tasks, docker for containerization.
+
 
 
 ## Features
+- **Intelligent Organization**: Automatically categorizes bookmarks using AI understanding of content
+- **Semantic Search**: Find bookmarks using natural language queries through the web app
+- **Enhanced Productivity**: Transform bookmarks from a "black hole" into an intelligent knowledge base
+- **Clean Architecture**: Backend-first design enables future frontend flexibility and potential API expansion
 
 
 ## Tools
