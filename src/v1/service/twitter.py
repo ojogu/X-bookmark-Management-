@@ -381,11 +381,14 @@ class TwitterService:
             endpoint = f"/users/{x_id}/bookmarks"
             # logger.info(f"url: {endpoint}")
             response = await self._make_request(access_token, 'GET', endpoint, params=params)
+            logger.info(f"successfully fetched bookmarks for user: {user_id}")
+            logger.info(f"response: {response}")
+            return response 
+        
             # logger.info(f"header from X: {response.header}")
-            # logger.info(f"full response: {response}")
-            cleaned = BookmarkService.parse_bookmarks(response, user_id)
-            logger.info(f"Fetched {len(cleaned['bookmarks'])} bookmarks, meta: {cleaned['meta']}")
-            return cleaned #both bookmark and meta
+            # # logger.info(f"full response: {response}")
+            # cleaned = BookmarkService.parse_bookmarks(response, user_id)
+            # return cleaned #both bookmark and meta
         except Exception as e:
             logger.error(f"Failed to get bookmarks for user_id {user_id}: {e}", exc_info=True)
             raise

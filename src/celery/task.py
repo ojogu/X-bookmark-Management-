@@ -10,7 +10,7 @@ from src.v1.service.user import UserService
 from src.v1.service.utils import get_valid_tokens
 from src.utils.db import get_async_db_session
 from src.v1.service.bookmark import BookmarkService
-
+from src.v1.service import data 
 # @asynccontextmanager
 # async def get_db_session():
 #     db = await get_db_session_no_context()
@@ -89,23 +89,29 @@ def fetch_write_bookmark_task(self, user_id):
                 if not tokens:
                     logger.warning(f"No valid tokens for user_id={user_id}. Skipping.")
                     return {"user_id": user_id, "status": "no_tokens"}
-
+                
+                # logger.info(f"tokens found: {tokens}")
                 access_token = tokens.get("access_token")
                 x_id = tokens.get("x_id")
                 if not access_token or not x_id:
                     logger.warning(f"Missing access_token/x_id for user_id={user_id}. Skipping.")
                     return {"user_id": user_id, "status": "missing_credentials"}
 
-                #TODO: check for latest next token in the db, if any pass it to fetch the next post, to fetch latest post
-                bookmarks = await twitter_service.get_bookmarks(
-                    access_token=access_token,
-                    x_id=x_id,
-                    user_id=user_id,
-                    max_results=2,
-                )
+                next_token = await bookmark_service.fetch_next_token(db=session, user_id=user_id)
+                
+                bookmarks = data.test_data
+                # bookmarks = await twitter_service.get_bookmarks(
+                #     access_token=access_token,
+                #     x_id=x_id,
+                #     user_id=user_id,
+                #     max_results=3,
+                #     pagination_token=next_token
+                # )
                 logger.info(f"Fetched {len(bookmarks)} bookmarks for user_id={user_id}")
 
-                # TODO: write to DB here
+      
+                write_db = await bookmark_service.save_bookmarks(session, user_id, bookmarks)
+                
                 return {"user_id": user_id, "bookmarks": len(bookmarks), "status": "success"}
 
         except Exception as e:

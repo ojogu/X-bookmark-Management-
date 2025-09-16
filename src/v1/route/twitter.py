@@ -3,7 +3,6 @@ from src.v1.auth.service import AccessTokenBearer, auth_service
 from src.utils.log import setup_logger
 from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
-from src.v1.schemas.bookmark import BookmarkSchema
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from src.v1.service.user import UserService

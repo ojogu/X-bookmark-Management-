@@ -59,7 +59,7 @@ class BookmarkService():
     async def check_if_bookmark_exists(self, db:AsyncSession, post_id, user_id):
         result = await db.execute(
             sa.select(BookmarkModel).where(
-                post_id == PostModel.post_id,
+                post_id == PostModel.id,
                 user_id == User.id
                 
                 )
@@ -67,6 +67,17 @@ class BookmarkService():
         if not result:
             return None
         return result.scalar_one_or_none()
+    
+    
+    async def fetch_next_token(self, db:AsyncSession, user_id):
+        next_token = await db.execute(
+            sa.select(BookmarkModel.next_token).where(
+                user_id == BookmarkModel.user_id
+            )
+        )
+        if not next_token:
+            return None
+        return next_token.scalar_one_or_none()
     
     async def save_bookmarks(self, db: AsyncSession, user_id: str, api_response: Dict[str, Any]):
         """
@@ -78,34 +89,45 @@ class BookmarkService():
             api_response: Raw JSON response from Twitter API
         """
         logger.info(f"Starting bookmark save pipeline for user_id={user_id}")
+        
         #check if user exists
+        logger.debug(f"Checking if user {user_id} exists")
         user = await self.user_service.check_if_user_exists_user_id(user_id)
         if not user:
+            logger.error(f"User {user_id} not found")
             raise NotFoundError(f"user: {user_id} does not exists" )
         
         # Parse & validate API response using Pydantic
+        logger.debug(f"Parsing API response for user {user_id}")
         validated_response = BookmarkService.parse_bookmarks_response(api_response, user_id)
-
+        logger.info(f"Found {len(validated_response.bookmarks)} bookmarks to process for user {user_id}")
+        
+        logger.info(f"parsed data: {validated_response}")
         # Iterate through bookmarks and upsert data
-        for bm in validated_response.bookmarks:
+        for index, bm in enumerate(validated_response.bookmarks, 1):
+            logger.debug(f"Processing bookmark {index}/{len(validated_response.bookmarks)}")
             post_data = bm.post.model_dump() if hasattr(bm, 'post') else bm.model_dump().get('post')
             author_data = bm.author.model_dump() if hasattr(bm, 'author') else bm.model_dump().get('author')
 
             # ---- Handle Author ----
+            logger.debug(f"Checking author {author_data['id']}")
             author = await self.check_if_author_exists(db,author_data['id'])
             if not author:
+                logger.debug(f"Creating new author record for {author_data['id']}")
                 author = AuthorModel(
                     username=author_data.get('username', ''),
                     name=author_data.get('name', ''),
-                    profile_image_url=author_data.get('profile_image_url', ''),
+                    profile_image_url = str(author_data.get('profile_image_url', '')),
                     author_id_from_x=author_data.get('id', '')
                 )
-                await db.add(author)
-                await db.flush()  # flush to get author.id for FK
+                db.add(author)
+                await db.flush()
 
             # ---- Handle Post ----
+            logger.debug(f"Checking post {post_data['id']}")
             post = await self.check_if_post_exists(db,post_data['id'])
             if not post:
+                logger.debug(f"Creating new post record for {post_data['id']}")
                 post = PostModel(
                     post_id=post_data.get('id', ''),
                     text=post_data.get('text', ''),
@@ -114,27 +136,29 @@ class BookmarkService():
                     possibly_sensitive=post_data.get('possibly_sensitive', False),
                     author_id=author.id
                 )
-                await db.add(post)
-                await db.flush()  # flush to get post.id for FK
+                db.add(post)
+                await db.flush()
 
             # ---- Handle Bookmark ----
+            logger.debug(f"Checking if bookmark exists for post {post.id} and user {user_id}")
             existing_bm = await self.check_if_bookmark_exists(db, post_id=post.id, user_id=user_id)
     
             if not existing_bm:
+                logger.debug(f"Creating new bookmark for post {post.id}")
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
                     next_token=validated_response.meta.next_token
                 )
-                await db.add(bookmark)
+                db.add(bookmark)
 
-        # 3️⃣ Commit all changes
+        # Commit all changes
         try:
             await db.commit()
-            logger.info(f"Successfully saved bookmarks for user_id={user_id}")
+            logger.info(f"Successfully saved all {len(validated_response.bookmarks)} bookmarks for user_id={user_id}")
         except Exception as e:
             await db.rollback()
-            logger.error(f"Failed to save bookmarks for user_id={user_id}: {e}")
+            logger.error(f"Failed to save bookmarks for user_id={user_id}: {str(e)}", exc_info=True)
             raise
 
       
@@ -151,9 +175,14 @@ class BookmarkService():
         Returns:
             BookmarkResponse Pydantic model with validated and cleaned data.
         """
+        logger.info(f"bookmark data: {response}")
         logger.info(f"Parsing bookmarks for user_id={user_id}")
-
-        tweets_data = response.get("data", []) or []
+        if isinstance(response, dict):
+            tweets_data = response.get("data", [])
+        elif isinstance(response, list):
+            tweets_data = response
+        
+    
         authors_map = {u["id"]: u for u in response.get("includes", {}).get("users", []) or []}
         meta = response.get("meta", {}) or {}
 
@@ -216,52 +245,3 @@ class BookmarkService():
 
 
 
-    # async def write_bookmark(self, bookmark_data:dict):
-    #     """
-    #     this is to write the bookmark to the database, parse each field to the correct table
-    #     """
-    #     logger.info(f"Attempting to write bookmark data to the database.")
-    #     parsed_data = BookmarkService.parse_bookmarks
-    #     # Placeholder for actual database write logic
-    #     # In a real scenario, this would involve interacting with the ORM/DB
-    #     try:
-    #         # Example: Assuming bookmark_data needs to be saved
-    #         # For now, just log the data
-    #         logger.debug(f"Bookmark data received for writing: {bookmark_data}")
-    #         # Simulate a successful write
-    #         logger.info("Bookmark data successfully processed for writing (simulated).")
-    #         return {"status": "success", "message": "Bookmark data processed for writing."}
-    #     except Exception as e:
-    #         logger.error(f"Error writing bookmark data: {e}", exc_info=True)
-    #         raise ServerError(f"Failed to write bookmark: {e}")
-        
-    # async def fetch_store_bookmark(self,access_token, user_id, x_id, max_results):
-    #     logger.info(f"Attempting to fetch and store bookmarks for user with id: {user_id}")
-    #     user = await self.user_service.check_if_user_exists_user_id(user_id)
-    #     if not user:
-    #         logger.warning(f"User with id: {user_id} not found during bookmark fetch attempt.")
-    #         raise NotFoundError("User not found")
-    #     logger.debug(f"User {user_id} found. Proceeding to fetch bookmarks.")
-        
-    #     #fetching from db, since we have a cron job that fetches from the api and updates db
-    #     try:
-    #         bookmark_data = read_json_file("src/v1/service/bookmark.json")  # returns list of dicts
-    #         logger.debug(f"Read bookmark data from file: {len(bookmark_data)} entries.")
-    #         clean_data = _clean_structure(bookmark_data)
-    #         logger.debug("Cleaned bookmark data structure.")
-    #         validated_data = BookmarkResponse(**clean_data).model_dump()
-    #         logger.info(f"Successfully fetched and validated bookmark data for user: {user_id}.")
-    #         return validated_data
-    #     except FileNotFoundError:
-    #         logger.error("Bookmark data file not found.", exc_info=True)
-    #         raise ServerError("Bookmark data file not found.")
-    #     except Exception as e:
-    #         logger.error(f"Error fetching or structuring bookmark data for user {user_id}: {e}", exc_info=True)
-    #         raise ServerError(f"Failed to fetch or structure bookmark data: {e}")
-    
-    
-        # bookmarks = await twitter_service.get_bookmarks(                                                    access_token=access_token, 
-        #     user_id = user_id,
-        #     x_id = x_id,
-        #     max_results = max_results)
-        # return bookmarks

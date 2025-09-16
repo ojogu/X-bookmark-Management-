@@ -5,7 +5,7 @@ import httpx
 app = FastAPI()
 
 # Mock Frontend Endpoints
-
+url = "http://127.0.0.1:8000"
 @app.get("/", response_class=HTMLResponse)
 async def home_page():
     return """
@@ -24,7 +24,7 @@ async def login_page():
     # Call your backend to get OAuth URL
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get("https://cd4c6cfd3200.ngrok-free.app/auth/login")
+            response = await client.get(f"{url}/auth/login")
             data = response.json()
             oauth_url = data.get("url")
             

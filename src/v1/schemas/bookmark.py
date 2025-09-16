@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
 from datetime import datetime
 
 # ------------------
@@ -10,6 +10,13 @@ class Author(BaseModel):
     username: str
     name: str
     profile_image_url: Optional[HttpUrl] = None
+    
+    
+    model_config = ConfigDict(
+        ser_json_t_encoders={
+            HttpUrl: lambda v: str(v)
+        }
+    )
 
 # ------------------
 # Metrics Info

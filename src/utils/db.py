@@ -7,9 +7,9 @@ from .config import config
 from sqlalchemy.exc import SQLAlchemyError
 from src.utils.log import setup_logger
 from sqlalchemy.pool import NullPool
-logger = setup_logger(__name__, file_path="error.log")
 from contextlib import asynccontextmanager
 
+logger = setup_logger(__name__, file_path="error.log")
 
 # Create async engine
 engine = create_async_engine(
