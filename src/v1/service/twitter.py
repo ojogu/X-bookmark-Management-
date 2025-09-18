@@ -362,7 +362,7 @@ class TwitterService:
                 ),
 
                 # Expansions to include related objects
-                "expansions": "author_id,attachments.media_keys",        # expand user info + media objects
+                "expansions": "author_id,attachments.media_keys, referenced_tweets.id",        # expand user info + media objects
 
                 # User object fields to return when expanding author_id
                 "user.fields": "id,name,username,profile_image_url",     # basic user profile info

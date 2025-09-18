@@ -34,19 +34,38 @@ class CeleryConfig:
     task_queues = (
         Queue("default", routing_key="default"),
         
-        Queue("fetch_user_id", routing_key="fetch_user_id"),
+        #front sync 
+        Queue("fetch_user_id_for_front_sync_task", routing_key="fetch_user_id_for_front_sync_task"), #cron job 
+        Queue("front_sync_bookmark_task", routing_key="front_sync_bookmark_task"),
         
-        Queue("fetch_user_bookmarks_task", routing_key="fetch_user_bookmarks"),
+        
+        #backfill
+        Queue("fetch_user_id_for_backfill_task", routing_key="fetch_user_id_for_backfill_task"), #cron job
+        
+        Queue("backfill_bookmark_task", routing_key="backfill_bookmark_task"),
     )
     
     
+
     # --------------------------
     # Task Routing
     # --------------------------
     task_routes = {
-        "src.celery.task.fetch_user_id_task": {"queue": "fetch_user_id"}, #beat schedule 
-        
-        "src.celery.task.fetch_write_bookmark_task": {"queue": "fetch_user_bookmarks"}
+        # front sync
+        "src.celery.task.fetch_user_id_for_front_sync_task": {
+            "queue": "fetch_user_id_for_front_sync_task"
+        },
+        "src.celery.task.front_sync_bookmark_task": {
+            "queue": "front_sync_bookmark_task"
+        },
+
+        # backfill
+        "src.celery.task.fetch_user_id_for_backfill_task": {
+            "queue": "fetch_user_id_for_backfill_task"
+        },
+        "src.celery.task.backfill_bookmark_task": {
+            "queue": "backfill_bookmark_task"
+        },
     }
 
 
