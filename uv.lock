@@ -2076,6 +2076,20 @@ wheels = [
 ]
 
 [[package]]
+name = "xdk"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "requests-oauthlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d6/2f/825b349e3ad66153dafeb83148fec436a9fbb6c7f0b5c0513ac3205010f4/xdk-0.5.0.tar.gz", hash = "sha256:50ae91c6c4e608237f164223e223f806b79c7c8b60c5ec834e5a0015d62170e6", size = 335650, upload_time = "2025-12-09T00:39:33.212Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/b6/85a1a4ca796d7d99d62090c1dd876b2687c443f223eed87b25c730d88fc6/xdk-0.5.0-py3-none-any.whl", hash = "sha256:8c7cbf7735feef9a8be577d9c668310542f12188c63143a71990bcca381e740e", size = 141222, upload_time = "2025-12-09T00:39:31.931Z" },
+]
+
+[[package]]
 name = "xfeeds"
 version = "0.1.0"
 source = { virtual = "." }
@@ -2088,6 +2102,7 @@ dependencies = [
     { name = "gevent" },
     { name = "sqlalchemy" },
     { name = "tweepy", extra = ["async"] },
+    { name = "xdk" },
 ]
 
 [package.dev-dependencies]
@@ -2184,6 +2199,7 @@ requires-dist = [
     { name = "gevent", specifier = ">=25.8.2" },
     { name = "sqlalchemy", specifier = ">=2.0.40" },
     { name = "tweepy", extras = ["async"], specifier = ">=4.15.0" },
+    { name = "xdk", specifier = ">=0.5.0" },
 ]
 
 [package.metadata.requires-dev]

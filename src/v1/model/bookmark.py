@@ -16,13 +16,14 @@ class Bookmark(BaseModel):
     - Each bookmark belongs to exactly one post (post_data).
     """
     __tablename__ = "bookmarks"
+    #foreign keys
     user_id = sa.Column(sa.UUID, sa.ForeignKey('users.id'), primary_key=True, nullable=False)
     post_id = sa.Column(sa.UUID, sa.ForeignKey('posts.id'), primary_key=True, nullable=False)
+    
     
     #relationships
     user = relationship("User", backref="bookmarks")
     post = relationship("Post", backref="bookmarks")
-    next_token = sa.Column(sa.String, unique=True)
 
 
 

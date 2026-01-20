@@ -3,7 +3,7 @@ from src.v1.auth.service import AccessTokenBearer, auth_service
 from src.utils.log import setup_logger
 from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from src.v1.service.user import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,6 +74,7 @@ async def get_user_info(
 
 @twitter_router.get("/bookmarks")
 async def get_bookmarks(
+    pagination_token:Optional[str] = None,
     max_results: int = 50, #query parameter 
     user_details: AccessTokenBearer = Depends(access_token_bearer), bookmark_service:BookmarkService = Depends(get_bookmark_service),
     db: AsyncSession = Depends(get_session)
@@ -85,11 +86,12 @@ async def get_bookmarks(
         #TODO: fetch from db, not direct api
         tokens = await get_valid_tokens(user_id, db)
         access_token = tokens.get("access_token")
-        bookmarks = await bookmark_service.fetch_store_bookmark(
+        bookmarks = await twitter_service.get_bookmarks(
             access_token=access_token, 
             user_id = user_id,
             x_id = x_id,
             max_results = max_results,
+            pagination_token=pagination_token
             )
         return bookmarks
     except NotFoundError as e:

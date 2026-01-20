@@ -10,6 +10,7 @@ class Post(BaseModel):
     #relationship: Posts 1 → N Media
     
     post_id = sa.Column(sa.String, nullable=False, unique=True) #from twitter api
+    conversation_id = sa.Column(sa.String) #from twitter api
     text = sa.Column(sa.Text, nullable=False)
     created_at_from_twitter = sa.Column(sa.DateTime(timezone=True))
     lang = sa.Column(sa.String, nullable=False)
@@ -24,7 +25,7 @@ class Post(BaseModel):
 class Media(BaseModel):
     __tablename__ = "medias"
     #relationship: Posts 1 → N Media
-    post_id = sa.Column(sa.UUID, sa.ForeignKey('post.id'), nullable=False)
+    post_id = sa.Column(sa.UUID, sa.ForeignKey('posts.id'), nullable=False)
     media_key = sa.Column(sa.String, unique=True)
     media_type = sa.Column(sa.String, unique=True) #what kind of media it is (photo, video, animated_gif).
     url = sa.Column(sa.String, unique=True) #direct link to the media (only for images, not full videos).
@@ -35,4 +36,7 @@ class Media(BaseModel):
     
     
     
-     
+class MetaData(BaseModel):
+    __tablename__ = "metadata"
+    user_id = sa.Column(sa.UUID, sa.ForeignKey('users.id'), nullable=False)
+    next_token = sa.Column(sa.String, unique=True)

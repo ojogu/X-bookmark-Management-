@@ -102,7 +102,7 @@ async def dashboard(request: Request):
                 
                 async function makeApiCall() {{
                     try {{
-                        const response = await fetch('https://cd4c6cfd3200.ngrok-free.app/api/user-data', {{
+                        const response = await fetch('https://257b46155a88.ngrok-free.app/api/user-data', {{
                             headers: {{
                                 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token')
                             }}
