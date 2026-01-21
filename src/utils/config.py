@@ -15,6 +15,7 @@ class Config(BaseSettings):
     access_token_expiry:int
     refresh_token_expiry:int
     frontend_url:str
+    bearer_token:str
     celery_beat_interval:int
 
     model_config = SettingsConfigDict(
@@ -29,3 +30,4 @@ class Settings:
     PROJECT_NAME: str = "Xmarks"
     PROJECT_VERSION: str = "0.0.1"
     PROJECT_DESCRIPTION: str = "API for Xmarks; the ultimate premium bookmark managment system for X (former twitter)"
+    API_V1_PREFIX: str = "/api/v1"

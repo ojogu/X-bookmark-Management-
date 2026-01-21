@@ -6,7 +6,7 @@ from src.utils.db import init_db, drop_db
 from src.utils.redis import setup_redis
 from src.v1.auth.routes import auth_router
 from fastapi.middleware.cors import CORSMiddleware
-from src.utils.config import Settings 
+from src.utils.config import Settings, config
 from src.utils.exception import register_error_handlers
 from src.v1.route.twitter import twitter_router
 @asynccontextmanager
@@ -58,8 +58,8 @@ app.add_middleware(
 register_error_handlers(app)
 
 #register routers/blueprint
-app.include_router(auth_router)
-app.include_router(twitter_router)
+app.include_router(auth_router, prefix=Settings.API_V1_PREFIX)
+app.include_router(twitter_router, prefix=Settings.API_V1_PREFIX)
 
 
 @app.get("/")
@@ -75,7 +75,3 @@ def root():
 # if __name__ == "__main__":
 #     import uvicorn
 #     uvicorn.run("main:app",  port=8000, reload=True, host="0.0.0.0")
-    
-
-
-

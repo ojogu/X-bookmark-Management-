@@ -52,12 +52,15 @@ async def handle_login(twitter_client: TwitterAuthService = Depends(get_twitter_
 
 @auth_router.get("/callback")
 async def handle_callback(
-    request: Request, 
+    request: Request,
     twitter_client: TwitterAuthService = Depends(get_twitter_client)
 ):
     try:
+        logger.info("OAuth callback endpoint accessed")
         auth_code = request.query_params.get("code")
         state = request.query_params.get("state")
+        logger.info(f"auth_code: {auth_code}")
+        logger.info(f"state: {state}")
         error = request.query_params.get("error")
         
         # Handle authorization errors

@@ -27,46 +27,56 @@ class TwitterAuthService:
     async def get_auth_url(self) -> str:
         """Generate OAuth2 authorization URL using XDK"""
         try:
+            logger.info("Starting OAuth2 authorization URL generation")
+
             import secrets
             state = secrets.token_urlsafe(32)
+            logger.debug(f"Generated secure state parameter: {state[:10]}...")
 
             # Use XDK to generate the authorization URL
             # XDK will handle PKCE generation and URL construction automatically
             auth_url = self.client.get_authorization_url(state=state)
+            logger.info(f"Authorization URL generated: {auth_url[:50]}...")
 
             # Store the code_verifier for later use in token exchange
             code_verifier = self.client.oauth2_auth.get_code_verifier()
             await self.session.save_oauth_session(state=state, code_verifier=code_verifier)
+            logger.info(f"OAuth session data saved for state: {state[:10]}...")
 
-            logger.info(f"Generated auth URL for state={state[:10]}")
-            logger.info("Generated authorization URL successfully")
+            logger.info("OAuth2 authorization URL generation completed successfully")
             return auth_url
 
         except Exception as e:
-            logger.error(f"Failed to generate auth URL: {str(e)}", exc_info=True)
+            logger.error(f"Failed to generate OAuth2 authorization URL: {str(e)}", exc_info=True)
             raise
 
     async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> Dict:
         """Exchange authorization code for access token using XDK"""
         try:
             logger.info(f"Authorization response URL: {str(authorization_response_url)[:50]}...")
+            logger.info(f"Looking for code_verifier with state: {state}")
 
             # Retrieve code_verifier from session
             code_verifier = await self.session.get_code_verifier(state)
 
             if not code_verifier:
+                logger.error(f"No code_verifier found for state: {state}")
+                # Let's check if there are any OAuth sessions at all
+                active_sessions = await self.session.get_active_sessions_count()
+                logger.error(f"Total active OAuth sessions: {active_sessions}")
                 raise ValueError("Invalid or expired state parameter - no code_verifier found")
 
             # Clean up session after retrieving verifier
             await self.session.cleanup_oauth_session(state)
             logger.info("Cleaned up OAuth session data")
 
+            # Set the code_verifier on the XDK client before token exchange
+            # This ensures the correct PKCE verifier is used for this specific OAuth flow
+            self.client.oauth2_auth.code_verifier = code_verifier
+
             # Use XDK to exchange the authorization code for tokens
-            # XDK will handle the OAuth2 token exchange automatically
-            token_data = self.client.exchange_code(
-                authorization_response_url,  # XDK can parse this directly
-                code_verifier=code_verifier
-            )
+            # XDK will handle the OAuth2 token exchange automatically by parsing the URL
+            token_data = self.client.fetch_token(authorization_response_url)
 
             logger.info("Successfully exchanged code for tokens")
 
