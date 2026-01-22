@@ -158,17 +158,31 @@ class TwitterAuthService:
             )
 
             user_data = user_response.data
-            logger.info(f"Retrieved user info for: {user_data.username}")
 
-            # Convert XDK response to our expected format
-            user_dict = {
-                "id": user_data.id,
-                "username": user_data.username,
-                "name": user_data.name,
-                "profile_image_url": getattr(user_data, 'profile_image_url', None),
-                "followers_count": user_data.public_metrics.followers_count if user_data.public_metrics else 0,
-                "following_count": user_data.public_metrics.following_count if user_data.public_metrics else 0
-            }
+            # Handle both dict and object responses from XDK
+            if isinstance(user_data, dict):
+                username = user_data.get('username', 'unknown')
+                user_dict = {
+                    "id": user_data.get('id'),
+                    "username": username,
+                    "name": user_data.get('name'),
+                    "profile_image_url": user_data.get('profile_image_url'),
+                    "followers_count": user_data.get('public_metrics', {}).get('followers_count', 0),
+                    "following_count": user_data.get('public_metrics', {}).get('following_count', 0)
+                }
+            else:
+                # Handle Pydantic model response
+                username = getattr(user_data, 'username', 'unknown')
+                user_dict = {
+                    "id": getattr(user_data, 'id', None),
+                    "username": username,
+                    "name": getattr(user_data, 'name', None),
+                    "profile_image_url": getattr(user_data, 'profile_image_url', None),
+                    "followers_count": getattr(user_data, 'public_metrics', None).followers_count if getattr(user_data, 'public_metrics', None) else 0,
+                    "following_count": getattr(user_data, 'public_metrics', None).following_count if getattr(user_data, 'public_metrics', None) else 0
+                }
+
+            logger.info(f"Retrieved user info for: {username}")
 
             # Validate and create user
             validated_data = UserDataFromOauth(**user_dict).model_dump()

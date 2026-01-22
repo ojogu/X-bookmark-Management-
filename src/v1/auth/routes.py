@@ -80,7 +80,7 @@ async def handle_callback(
         
         # Your service handles all the PKCE/session logic
         in_app_token = await twitter_client.fetch_token_store_token(
-            authorization_response_url=request.url, 
+            authorization_response_url=str(request.url),
             state=state
         )
         in_app_access_token = in_app_token["access_token"]

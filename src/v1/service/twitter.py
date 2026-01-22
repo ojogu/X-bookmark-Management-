@@ -52,7 +52,8 @@ class TwitterService:
                 user_fields=['id', 'name', 'username', 'profile_image_url', 'description', 'public_metrics', 'verified', 'created_at', 'location', 'url']
             )
 
-            logger.info(f"Retrieved user info for: {user_response.data.username}")
+            username = user_response.data.get('username') if isinstance(user_response.data, dict) else getattr(user_response.data, 'username', 'unknown')
+            logger.info(f"Retrieved user info for: {username}")
             return self._user_to_dict(user_response.data)
 
         except Exception as e:

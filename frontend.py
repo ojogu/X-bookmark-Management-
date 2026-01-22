@@ -5,7 +5,8 @@ import httpx
 app = FastAPI()
 
 # Mock Frontend Endpoints
-url = "http://127.0.0.1:8000"
+#API endpoint
+url = " https://4mlncfwr-5000.uks1.devtunnels.ms/api/v1"
 @app.get("/", response_class=HTMLResponse)
 async def home_page():
     return """
@@ -24,7 +25,7 @@ async def login_page():
     # Call your backend to get OAuth URL
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"{url}/auth/login")
+            response = await client.get(f"https://4z6tg0fh.uks1.devtunnels.ms:5000/api/v1/auth/login")
             data = response.json()
             oauth_url = data.get("url")
             
