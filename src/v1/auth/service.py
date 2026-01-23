@@ -2,6 +2,7 @@ from datetime import timedelta, datetime
 from fastapi import Request
 import jwt
 import uuid
+from cryptography.fernet import Fernet
 from src.utils.config import config
 from src.v1.base.exception import TokenExpired
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
@@ -58,6 +59,11 @@ class AuthService():
         except jwt.PyJWTError as e:
             logger.error(f"error decoding token: {e}", exc_info=True)
             raise TokenExpired("error decoding token")
+        
+    @staticmethod
+    def encryption_key():
+        cipher = Fernet(config.encryption_key)
+        return cipher
 
 auth_service = AuthService()
 

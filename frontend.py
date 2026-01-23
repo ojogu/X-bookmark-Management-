@@ -6,7 +6,7 @@ app = FastAPI()
 
 # Mock Frontend Endpoints
 #API endpoint
-url = " https://4mlncfwr-5000.uks1.devtunnels.ms/api/v1"
+url = "https://4mlncfwr-5000.uks1.devtunnels.ms/api/v1"
 @app.get("/", response_class=HTMLResponse)
 async def home_page():
     return """
@@ -25,18 +25,69 @@ async def login_page():
     # Call your backend to get OAuth URL
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"https://4z6tg0fh.uks1.devtunnels.ms:5000/api/v1/auth/login")
-            data = response.json()
-            oauth_url = data.get("url")
-            
+            response = await client.get(f"{url}/auth/login")
+
+            if response.status_code == 200:
+                data = response.json()
+                oauth_url = data.get("url")
+
+                if oauth_url:
+                    return f"""
+                    <html>
+                        <body>
+                            <h1>Redirecting to Twitter...</h1>
+                            <script>
+                                window.location.href = "{oauth_url}";
+                            </script>
+                            <p>If not redirected, <a href="{oauth_url}">click here</a></p>
+                        </body>
+                    </html>
+                    """
+                else:
+                    return f"""
+                    <html>
+                        <body>
+                            <h1>Login Error</h1>
+                            <p>Invalid response from server: missing OAuth URL</p>
+                            <a href="/">Go back</a>
+                        </body>
+                    </html>
+                    """
+            else:
+                # Handle error responses
+                try:
+                    error_data = response.json()
+                    error_message = error_data.get("error", f"HTTP {response.status_code}")
+                except:
+                    error_message = f"HTTP {response.status_code}: {response.text[:100]}"
+
+                return f"""
+                <html>
+                    <body>
+                        <h1>Login Error</h1>
+                        <p>{error_message}</p>
+                        <a href="/">Go back</a>
+                    </body>
+                </html>
+                """
+
+        except httpx.ConnectError as e:
             return f"""
             <html>
                 <body>
-                    <h1>Redirecting to Twitter...</h1>
-                    <script>
-                        window.location.href = "{oauth_url}";
-                    </script>
-                    <p>If not redirected, <a href="{oauth_url}">click here</a></p>
+                    <h1>Login Error</h1>
+                    <p>Failed to connect to authentication service. Please try again later.</p>
+                    <a href="/">Go back</a>
+                </body>
+            </html>
+            """
+        except httpx.TimeoutException as e:
+            return f"""
+            <html>
+                <body>
+                    <h1>Login Error</h1>
+                    <p>Request timed out. Please try again.</p>
+                    <a href="/">Go back</a>
                 </body>
             </html>
             """
@@ -45,7 +96,7 @@ async def login_page():
             <html>
                 <body>
                     <h1>Login Error</h1>
-                    <p>Failed to get OAuth URL: {str(e)}</p>
+                    <p>An unexpected error occurred: {str(e)[:100]}</p>
                     <a href="/">Go back</a>
                 </body>
             </html>

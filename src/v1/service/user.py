@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
 from datetime import datetime, timedelta, timezone 
-from src.v1.schemas.user import User_Token
+from src.v1.auth.service import auth_service
+# from src.v1.auth.service import au
 from src.v1.base.exception import (
     Environment_Variable_Exception,
     InUseError,
@@ -24,10 +25,11 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
 
-def normalize_token_expiry(token_dict: dict) -> dict:
+def parse_token_data(token_dict: dict) -> dict:
     """
     Normalize token expiry so that token_dict always has `expires_at` (datetime in UTC).
-    Handles both 'expires_in' (seconds) and 'expires_at' (timestamp or datetime).
+    Handles both 'expires_in' (int seconds) and 'expires_at' (timestamp or datetime).
+    Also encrypts access_token and refresh_token if present.
     """
     updated_dict = token_dict.copy()
 
@@ -53,6 +55,14 @@ def normalize_token_expiry(token_dict: dict) -> dict:
         raise KeyError("No 'expires_in' or 'expires_at' key found in token dictionary")
 
     updated_dict["expires_at"] = expires_at
+
+    # Encrypt access_token and refresh_token if present
+    cipher = auth_service.encryption_key()
+    if "access_token" in updated_dict:
+        updated_dict["access_token"] = cipher.encrypt(updated_dict["access_token"].encode()).decode()
+    if "refresh_token" in updated_dict:
+        updated_dict["refresh_token"] = cipher.encrypt(updated_dict["refresh_token"].encode()).decode()
+
     return updated_dict
 
 
@@ -102,7 +112,7 @@ class UserService():
 
     async def store_user_token(self, user_id: str, user_token: dict):
         logger.info(f"user tokens: {user_token}")
-        updated_user_tokens = normalize_token_expiry(user_token)
+        updated_user_tokens = parse_token_data(user_token)
         logger.info(f"updated user tokens: {updated_user_tokens}")
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:
@@ -121,23 +131,14 @@ class UserService():
         else:
             logger.info(f"No existing token for user {user_id}, creating new one.")
             user_tokens = UserToken(user_id=user_id, **updated_user_tokens)
-            self.db.add(user_tokens)
 
         try:
+            self.db.add(user_tokens)
             await self.db.flush()
-            await self.db.refresh(user_tokens)
-            # await self.db.commit()
+            # await self.db.refresh(user_tokens)
+            await self.db.commit()
             logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}")
             return user_tokens
-        except IntegrityError as e:
-            await self.db.rollback()
-            logger.error(f"IntegrityError while storing token for user {user_id}: {e}")
-            if "unique constraint" in str(e).lower():
-                raise AlreadyExistsError(
-                    f"Token for user_id '{user_id}' already exists (concurrent request?)."
-                )
-            else:
-                raise ServerError(f"Database integrity error: {e}") from e
         except SQLAlchemyError as e:
             await self.db.rollback()
             logger.error(f"Database error while storing token for user {user_id}: {e}")
@@ -179,7 +180,7 @@ class UserService():
                 sa.select(UserToken).where(
                     sa.and_(
                         UserToken.user_id == user_id,
-                        UserToken.is_expired == True
+                        UserToken.is_expired 
                     )
                 )
             )

@@ -5,11 +5,11 @@ from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status, Request, Depends
-from src.v1.service.user import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
 from src.utils.config import config
 from urllib.parse import urlencode
+from src.v1.route.dependencies import get_user_service, get_bookmark_service
 from src.v1.service.bookmark import BookmarkService
 from src.v1.base.exception import (
     Environment_Variable_Exception,
@@ -30,30 +30,6 @@ access_token_bearer = AccessTokenBearer()
 logger = setup_logger(__name__, file_path="auth.log")
 
 twitter_router = APIRouter(prefix="/twitter")
-
-
-def get_user_service(db: AsyncSession = Depends(get_session)):
-    """
-    Dependency function to get an instance of UserService.
-
-    Returns:
-        UserService: An instance of the user service.
-    """
-    return UserService(db=db)
-
-
-
-def get_bookmark_service(user_service: UserService = Depends(get_user_service)):
-    """
-    Dependency function to get an instance of BookmarkService.
-
-    Args:
-        user_service (UserService): The user service dependency.
-
-    Returns:
-        BookmarkService: An instance of the BookmarkService service.
-    """
-    return BookmarkService(user_service=user_service)
 
 
 @twitter_router.get("/user-info")

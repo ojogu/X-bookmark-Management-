@@ -19,3 +19,8 @@ class ErrorResponse(BaseModel):
     data: Optional[Any] = None
     role: Optional[str] = None
 
+class SuccessResponse(BaseModel):
+    status:str = "success"
+    message:str
+    data: Optional[Any] = None
+    role: Optional[str] = None

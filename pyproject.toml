@@ -8,6 +8,7 @@ dependencies = [
     "asgiref>=3.9.1",
     "asyncpg>=0.30.0",
     "bcrypt>=4.3.0",
+    "cryptography>=46.0.3",
     "fastapi[all]>=0.115.12",
     "flower>=2.0.1",
     "gevent>=25.8.2",

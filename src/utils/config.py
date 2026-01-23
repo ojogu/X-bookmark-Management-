@@ -17,6 +17,7 @@ class Config(BaseSettings):
     frontend_url:str
     bearer_token:str
     celery_beat_interval:int
+    encryption_key:str
 
     model_config = SettingsConfigDict(
         case_sensitive=False,

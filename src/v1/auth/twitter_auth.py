@@ -28,6 +28,7 @@ class TwitterAuthService:
         """Generate OAuth2 authorization URL using XDK"""
         try:
             logger.info("Starting OAuth2 authorization URL generation")
+            logger.info(f"XDK client configuration - client_id: {config.client_id[:10]}..., redirect_uri: {config.redirect_uri}")
 
             import secrets
             state = secrets.token_urlsafe(32)
@@ -35,23 +36,31 @@ class TwitterAuthService:
 
             # Use XDK to generate the authorization URL
             # XDK will handle PKCE generation and URL construction automatically
+            logger.info("Calling XDK get_authorization_url method")
             auth_url = self.client.get_authorization_url(state=state)
-            logger.info(f"Authorization URL generated: {auth_url[:50]}...")
+            logger.info(f"Authorization URL generated successfully: {auth_url[:50]}...")
+            logger.info(f"Full auth URL length: {len(auth_url)} characters")
 
             # Store the code_verifier for later use in token exchange
+            logger.info("Retrieving code_verifier from XDK client")
             code_verifier = self.client.oauth2_auth.get_code_verifier()
+            logger.debug(f"Code verifier length: {len(code_verifier) if code_verifier else 0}")
+
+            logger.info(f"Saving OAuth session for state: {state[:10]}...")
             await self.session.save_oauth_session(state=state, code_verifier=code_verifier)
-            logger.info(f"OAuth session data saved for state: {state[:10]}...")
+            logger.info("OAuth session data saved successfully")
 
             logger.info("OAuth2 authorization URL generation completed successfully")
             return auth_url
 
         except Exception as e:
             logger.error(f"Failed to generate OAuth2 authorization URL: {str(e)}", exc_info=True)
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"XDK client state - has token: {hasattr(self.client, 'token')}, token value: {self.client.token if hasattr(self.client, 'token') else 'None'}")
             raise
 
     async def fetch_token_store_token(self, authorization_response_url: str, state: str) -> Dict:
-        """Exchange authorization code for access token using XDK"""
+        """Exchange authorization code for access token using XDK, store tokens and authenticate user data"""
         try:
             logger.info(f"Authorization response URL: {str(authorization_response_url)[:50]}...")
             logger.info(f"Looking for code_verifier with state: {state}")
@@ -83,7 +92,7 @@ class TwitterAuthService:
             # Convert token response to our expected format
             self.token_response = User_Token(**token_data).model_dump()
 
-            # Convert expires_in to datetime object for DB storage
+            # Convert expires_in from int (seconds) to datetime object for DB storage
             expires_in_seconds = self.token_response["expires_in"]
             expires_at = await self._convert_to_expiry_datetime(expires_in_seconds)
             self.token_response["expires_at"] = expires_at
@@ -91,7 +100,7 @@ class TwitterAuthService:
 
             access_token = self.token_response["access_token"]
 
-            # Fetch user data and store in DB
+            # Fetch authenticated user data from x and store in DB
             user_data = await self.get_user_info_store_in_db(access_token)
             logger.info(f"User data stored with ID: {user_data.id}")
             user_id = user_data.id
