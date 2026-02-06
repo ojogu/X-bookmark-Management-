@@ -18,6 +18,8 @@ class Config(BaseSettings):
     bearer_token:str
     celery_beat_interval:int
     encryption_key:str
+    celery_broker_url:str
+    celery_result_backend:str
 
     model_config = SettingsConfigDict(
         case_sensitive=False,

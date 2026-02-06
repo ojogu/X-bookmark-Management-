@@ -11,8 +11,11 @@ wheels/
 
 # Virtual environments
 /env
+.venv/
 
 .env
 /logs
 dump.rdb
 tasks.txt
+
+Dockerfile

@@ -136,8 +136,8 @@ async def dashboard(request: Request):
         <body>
             <h1>Welcome to Dashboard!</h1>
             <p><strong>You are logged in!</strong></p>
-            <p>Your JWT access token: <code>{access_token[:20]}...</code></p>
-            <p>Your JWT refresh token: <code>{refresh_token[:20]}...</code></p>
+            <p>Your JWT access token: <code>{access_token}...</code></p>
+            <p>Your JWT refresh token: <code>{refresh_token}...</code></p>
             
             <h3>Available Actions:</h3>
             <button onclick="makeApiCall()">Test API Call</button>

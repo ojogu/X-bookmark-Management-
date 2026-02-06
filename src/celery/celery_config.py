@@ -14,8 +14,8 @@ class CeleryConfig:
     # --------------------------
     # Redis Settings
     # --------------------------
-    broker_url = config.redis_url
-    result_backend = config.redis_url
+    broker_url = config.celery_broker_url
+    result_backend = config.celery_result_backend
 
     # --------------------------
     # Serialization
@@ -23,7 +23,6 @@ class CeleryConfig:
     task_serializer = "json"
     result_serializer = "json"
     accept_content = ["json"]
-
     timezone = "UTC"
     enable_utc = True
 

@@ -25,6 +25,52 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
 
+def encrypt_token(token: str) -> str:
+    """
+    Encrypt a token string using the encryption key from auth service.
+
+    Args:
+        token: The token string to encrypt
+
+    Returns:
+        Encrypted token as a string
+    """
+    cipher = auth_service.encryption_key()
+
+    # 1. Prepare the data
+    raw_token = token.encode()
+
+    # 2. Encrypt it
+    encrypted_bytes = cipher.encrypt(raw_token)
+
+    # 3. Convert to string for DB storage
+    token_to_store = encrypted_bytes.decode('utf-8')
+
+    return token_to_store
+
+def decrypt_token(encrypted_token: str) -> str:
+    """
+    Decrypt an encrypted token string using the encryption key from auth service.
+
+    Args:
+        encrypted_token: The encrypted token string to decrypt
+
+    Returns:
+        Decrypted token as a string
+    """
+    cipher = auth_service.encryption_key()
+
+    # 1. Prepare the encrypted data
+    encrypted_bytes = encrypted_token.encode()
+
+    # 2. Decrypt it
+    decrypted_bytes = cipher.decrypt(encrypted_bytes)
+
+    # 3. Convert to string
+    decrypted_token = decrypted_bytes.decode('utf-8')
+
+    return decrypted_token
+
 def parse_token_data(token_dict: dict) -> dict:
     """
     Normalize token expiry so that token_dict always has `expires_at` (datetime in UTC).
@@ -57,11 +103,10 @@ def parse_token_data(token_dict: dict) -> dict:
     updated_dict["expires_at"] = expires_at
 
     # Encrypt access_token and refresh_token if present
-    cipher = auth_service.encryption_key()
     if "access_token" in updated_dict:
-        updated_dict["access_token"] = cipher.encrypt(updated_dict["access_token"].encode()).decode()
+        updated_dict["access_token"] = encrypt_token(updated_dict["access_token"])
     if "refresh_token" in updated_dict:
-        updated_dict["refresh_token"] = cipher.encrypt(updated_dict["refresh_token"].encode()).decode()
+        updated_dict["refresh_token"] = encrypt_token(updated_dict["refresh_token"])
 
     return updated_dict
 
@@ -92,22 +137,11 @@ class UserService():
             logger.info(f"Successfully created new user with x_id: {x_id}")
             return new_user
         
-        except IntegrityError as e:
-            await self.db.rollback()
-            logger.error(f"IntegrityError while creating user {x_id}: {str(e)}")
-            # Check if it's a unique constraint violation (though checked above, good practice)
-            if "unique constraint" in str(e).lower():
-                raise AlreadyExistsError(
-                    f"x_id '{user_data.x_id}' is already registered (concurrent request?)."
-                )
-            else:
-                logger.error(f"Database integrity error for user {x_id}: {str(e)}")
-                raise ServerError(f"Database integrity error: {e}") from e
-                
+
         except SQLAlchemyError as e:
             await self.db.rollback()
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
-            raise ServerError(f"Could not create user: {e}") from e
+            raise ServerError() 
 
 
     async def store_user_token(self, user_id: str, user_token: dict):
@@ -116,7 +150,7 @@ class UserService():
         logger.info(f"updated user tokens: {updated_user_tokens}")
         user = await self.check_if_user_exists_user_id(user_id)
         if not user:
-            raise NotFoundError("User id not found, register")
+            raise NotFoundError("User id not found")
 
         result = await self.db.execute(
             sa.select(UserToken).where(UserToken.user_id == user_id)
@@ -134,9 +168,9 @@ class UserService():
 
         try:
             self.db.add(user_tokens)
-            await self.db.flush()
-            # await self.db.refresh(user_tokens)
+            # await self.db.flush()
             await self.db.commit()
+            await self.db.refresh(user_tokens)
             logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}")
             return user_tokens
         except SQLAlchemyError as e:
@@ -162,7 +196,24 @@ class UserService():
         result = await self.db.execute(
             sa.select(UserToken).where(UserToken.user_id == user_id)
         )
-        return result.scalar_one_or_none()
+        user_token = result.scalar_one_or_none()
+
+        if user_token:
+            # Decrypt the encrypted tokens
+            decrypted_access_token = decrypt_token(user_token.access_token)
+            decrypted_refresh_token = decrypt_token(user_token.refresh_token)
+
+            # Return token data as a dictionary with decrypted tokens
+            return {
+                "user_id": user_token.user_id,
+                "access_token": decrypted_access_token,
+                "token_type": user_token.token_type,
+                "scope": user_token.scope,
+                "refresh_token": decrypted_refresh_token,
+                "expires_at": user_token.expires_at,
+                "is_expired": user_token.is_expired
+            }
+        return None
     
     # async def fetch_user_id(self, user_id):
     #     result = await self.db.execute(
@@ -216,3 +267,6 @@ class UserService():
     async def fetch_X_id_for_a_user(self, user_id: str):
         user = await self.check_if_user_exists_user_id(user_id)
         return user.x_id
+    
+    
+    

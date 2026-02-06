@@ -1,0 +1,59 @@
+name: Xmarks
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    depends_on:
+      - cache
+      - queue
+
+  worker:
+    build: .
+    command: celery -A src.celery.celery worker -l info
+    env_file:
+      - .env
+    depends_on:
+      - cache
+      - queue
+
+  celery_beat:
+    build: .
+    command: celery -A src.celery.celery beat -l info
+    env_file:
+      - .env
+    depends_on:
+      - cache
+      - queue
+
+  flower:
+    build: .
+    command: celery -A src.celery.celery flower --port=5555
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    depends_on:
+      - cache
+      - queue
+
+  cache:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6800:6379"
+
+  queue:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
