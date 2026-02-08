@@ -1,19 +1,24 @@
-from datetime import datetime, timezone
 import json
 import re
 from typing import Union
 from src.utils.log import setup_logger
 from src.v1.service.user import UserService
-# from src.utils.db import get_manual_db_session
+from src.v1.auth.service import encrypt_token, decrypt_token
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.auth.twitter_auth import TwitterAuthService
 
+
 logger = setup_logger(__name__, file_path="auth.log")
+
+
 
 async def get_valid_tokens(user_id: str, db: AsyncSession) -> dict:
     """
     Get valid tokens for a user, refreshing if expired.
-
+    
+    This function now uses the new dependency injection approach to avoid
+    circular dependencies between UserService and TwitterAuthService.
+    
     Args:
         user_id: The user ID to fetch tokens for
         db: Async database session
@@ -27,44 +32,19 @@ async def get_valid_tokens(user_id: str, db: AsyncSession) -> dict:
     """
     logger.info(f"Attempting to get valid tokens for user: {user_id}")
     try:
-        #TODO: use depedency injection rather than manual instansiation
+        # Create services with dependency injection
         user_service: UserService = UserService(db=db)
         twitter_auth_service = TwitterAuthService(user_service)
-        x_id = await user_service.fetch_X_id_for_a_user(user_id)
         
-        tokens = await user_service.fetch_user_token(user_id=user_id)
-        if not tokens:
-            logger.warning(f"No tokens found for user: {user_id}")
-            raise ValueError(f"No tokens found for user: {user_id}")
-        
-        current_time = datetime.now(timezone.utc)
-        is_expired = current_time > tokens["expires_at"] if tokens["expires_at"] else True
-        
-    
-        # Check expiration directly on the fetched token
-        if is_expired:
-            logger.info(f"Token expired for user: {user_id}, fetching new tokens")
-            new_tokens = await twitter_auth_service.refresh_token(tokens["refresh_token"])
-            logger.info(f"New token fetched for user: {user_id}")
-            user_tokens = await user_service.store_user_token(user_id=user_id, user_token=new_tokens)
-            logger.info(f"New token stored for user: {user_id}")
-        else:
-            logger.info(f"Token for user: {user_id} is still valid")
-            user_tokens = tokens
-
-        return _create_token_response(user_tokens, x_id)
+        # Use the new UserService method that accepts the refresh service
+        tokens = await user_service.get_valid_tokens(user_id=user_id, refresh_service=twitter_auth_service)
+        logger.info(f"Successfully retrieved valid tokens for user: {user_id}")
+        return tokens
             
     except Exception as e:
         logger.error(f"An error occurred while getting valid tokens for user {user_id}: {e}", exc_info=True)
         raise
 
-def _create_token_response(user_tokens: dict, x_id: str) -> dict:
-    """Create a standardized token response dictionary."""
-    return {
-        "access_token": user_tokens["access_token"],
-        "user_id": user_tokens["user_id"],
-        "x_id": x_id
-    }
 
 def _clean_value(value):
     """Clean strings by removing newlines/tabs and extra spaces."""

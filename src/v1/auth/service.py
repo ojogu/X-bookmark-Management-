@@ -12,6 +12,54 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="auth.log")
 
 
+def encrypt_token(token: str) -> str:
+    """
+    Encrypt a token string using the encryption key from auth service.
+
+    Args:
+        token: The token string to encrypt
+
+    Returns:
+        Encrypted token as a string
+    """
+    cipher = auth_service.encryption_key()
+
+    # 1. Prepare the data
+    raw_token = token.encode()
+
+    # 2. Encrypt it
+    encrypted_bytes = cipher.encrypt(raw_token)
+
+    # 3. Convert to string for DB storage
+    token_to_store = encrypted_bytes.decode('utf-8')
+
+    return token_to_store
+
+
+def decrypt_token(encrypted_token: str) -> str:
+    """
+    Decrypt an encrypted token string using the encryption key from auth service.
+
+    Args:
+        encrypted_token: The encrypted token string to decrypt
+
+    Returns:
+        Decrypted token as a string
+    """
+    cipher = auth_service.encryption_key()
+
+    # 1. Prepare the encrypted data
+    encrypted_bytes = encrypted_token.encode()
+
+    # 2. Decrypt it
+    decrypted_bytes = cipher.decrypt(encrypted_bytes)
+
+    # 3. Convert to string
+    decrypted_token = decrypted_bytes.decode('utf-8')
+
+    return decrypted_token
+
+
 class AuthService():
     """this class handles in-app authentication (jwt access token, refresh token)
     """

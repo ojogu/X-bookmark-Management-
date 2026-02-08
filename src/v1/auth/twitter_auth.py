@@ -4,6 +4,7 @@ from src.utils.config import config
 from src.v1.service.user import UserService
 from src.v1.service.oauth_session import OAuthSessionService
 from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
+from src.v1.service.interfaces import TokenRefreshService
 from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
 from datetime import timedelta
@@ -13,7 +14,7 @@ logger = setup_logger(__name__, file_path="service.log")
 
 
 
-class TwitterAuthService:
+class TwitterAuthService(TokenRefreshService):
     """
     this service handles all of twitter Oauth process
     """

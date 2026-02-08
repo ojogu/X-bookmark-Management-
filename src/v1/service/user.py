@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
 from datetime import datetime, timedelta, timezone 
-from src.v1.auth.service import auth_service
+from .interfaces import TokenRefreshService
+from src.v1.auth.service import encrypt_token, decrypt_token
 # from src.v1.auth.service import au
 from src.v1.base.exception import (
     Environment_Variable_Exception,
@@ -25,51 +26,6 @@ from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="user.log")
 
 
-def encrypt_token(token: str) -> str:
-    """
-    Encrypt a token string using the encryption key from auth service.
-
-    Args:
-        token: The token string to encrypt
-
-    Returns:
-        Encrypted token as a string
-    """
-    cipher = auth_service.encryption_key()
-
-    # 1. Prepare the data
-    raw_token = token.encode()
-
-    # 2. Encrypt it
-    encrypted_bytes = cipher.encrypt(raw_token)
-
-    # 3. Convert to string for DB storage
-    token_to_store = encrypted_bytes.decode('utf-8')
-
-    return token_to_store
-
-def decrypt_token(encrypted_token: str) -> str:
-    """
-    Decrypt an encrypted token string using the encryption key from auth service.
-
-    Args:
-        encrypted_token: The encrypted token string to decrypt
-
-    Returns:
-        Decrypted token as a string
-    """
-    cipher = auth_service.encryption_key()
-
-    # 1. Prepare the encrypted data
-    encrypted_bytes = encrypted_token.encode()
-
-    # 2. Decrypt it
-    decrypted_bytes = cipher.decrypt(encrypted_bytes)
-
-    # 3. Convert to string
-    decrypted_token = decrypted_bytes.decode('utf-8')
-
-    return decrypted_token
 
 def parse_token_data(token_dict: dict) -> dict:
     """
@@ -114,7 +70,6 @@ def parse_token_data(token_dict: dict) -> dict:
 class UserService():
     def __init__(self, db:AsyncSession):
         self.db = db
-    
 
     async def create_user(self, user_data: dict):
         x_id = user_data["x_id"]
@@ -215,14 +170,7 @@ class UserService():
             }
         return None
     
-    # async def fetch_user_id(self, user_id):
-    #     result = await self.db.execute(
-    #         sa.select(User.id).
-    #         where(
-    #             User.id == user_id
-    #         )
-    #     )
-    #     return result.scalar_one_or_none()
+
     
     async def is_token_expired(self, user_id):
         logger.info(f"Checking if token is expired for user_id: {user_id}")
@@ -267,6 +215,57 @@ class UserService():
     async def fetch_X_id_for_a_user(self, user_id: str):
         user = await self.check_if_user_exists_user_id(user_id)
         return user.x_id
+
+    async def get_valid_tokens(self, user_id: str, refresh_service: TokenRefreshService) -> dict:
+        """
+        Get valid tokens for a user, refreshing if expired.
+        
+        This method uses dependency injection to avoid circular dependencies
+        between UserService and TwitterAuthService.
+        
+        Args:
+            user_id: The user ID to fetch tokens for
+            refresh_service: TokenRefreshService implementation for refreshing tokens
+            
+        Returns:
+            Dictionary containing access_token, user_id, and x_id
+            
+        Raises:
+            ValueError: If no tokens found for user
+            Exception: For other errors during token processing
+        """
+        logger.info(f"Attempting to get valid tokens for user: {user_id}")
+        try:
+            x_id = await self.fetch_X_id_for_a_user(user_id)
+            
+            tokens = await self.fetch_user_token(user_id=user_id)
+            if not tokens:
+                logger.warning(f"No tokens found for user: {user_id}")
+                raise ValueError(f"No tokens found for user: {user_id}")
+            
+            current_time = datetime.now(timezone.utc)
+            is_expired = current_time > tokens["expires_at"] if tokens["expires_at"] else True
+            
+            # Check expiration directly on the fetched token
+            if is_expired:
+                logger.info(f"Token expired for user: {user_id}, fetching new tokens")
+                new_tokens = await refresh_service.refresh_token(tokens["refresh_token"])
+                logger.info(f"New token fetched for user: {user_id}")
+                user_tokens = await self.store_user_token(user_id=user_id, user_token=new_tokens)
+                logger.info(f"New token stored for user: {user_id}")
+            else:
+                logger.info(f"Token for user: {user_id} is still valid")
+                user_tokens = tokens
+
+            return {
+                "access_token": user_tokens["access_token"],
+                "user_id": user_tokens["user_id"],
+                "x_id": x_id
+            }
+            
+        except Exception as e:
+            logger.error(f"An error occurred while getting valid tokens for user {user_id}: {e}", exc_info=True)
+            raise
     
     
     
