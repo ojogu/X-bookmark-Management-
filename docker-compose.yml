@@ -12,6 +12,9 @@ services:
     depends_on:
       - cache
       - queue
+    volumes:
+      - ./logs:/app/logs 
+      - ./src:/app/src 
 
   worker:
     build: .

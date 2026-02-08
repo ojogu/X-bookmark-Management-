@@ -35,5 +35,5 @@ COPY --from=builder /usr/local /usr/local
 # Copy app source from the build step filesystem into runtime filesystem
 COPY --from=builder /app/src ./src
 EXPOSE 5000
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
 

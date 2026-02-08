@@ -12,8 +12,10 @@ bg_task.conf.update(
     # Important for async tasks
     task_always_eager=False,
 )
+bg_task.conf.broker_connection_retry_on_startup = True
 
 bg_task.config_from_object(CeleryConfig)
+
 interval = config.celery_beat_interval
 #configure celery beat
 bg_task.conf.beat_schedule = {

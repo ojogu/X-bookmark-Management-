@@ -11,17 +11,17 @@ CACHE_TTL = 300
 REDIS_URL = config.redis_url
 
 _redis: Optional[redis.Redis] = None
-
 async def setup_redis() -> redis.Redis:
     global _redis
     if _redis is None:
-        # logger.info(f"Initializing Redis connection to {REDIS_URL}")
+        logger.info(f"Initializing Redis connection to {REDIS_URL}")
         try:
             _redis = redis.from_url(REDIS_URL, decode_responses=True)
             # logger.info("Redis connection established successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Redis connection: {str(e)}")
-            raise
+            raise 
+        
     return _redis
 
 async def get_redis() -> redis.Redis:
@@ -29,7 +29,6 @@ async def get_redis() -> redis.Redis:
         logger.error("Redis connection not initialized")
         raise RuntimeError("Redis has not been initialized. Call setup_redis() first.")
     return _redis
-
 
 async def get_or_fetch_cache(key: str, fetch_callback, ttl: int = CACHE_TTL):
     try:
@@ -40,7 +39,6 @@ async def get_or_fetch_cache(key: str, fetch_callback, ttl: int = CACHE_TTL):
         if cached:
             logger.debug(f"Cache hit for key: {key}, value {cached}")
             return json.loads(cached)
-
         # fetch fresh data
         logger.debug("Cache miss, fetching fresh data...")
         fresh = await fetch_callback()
