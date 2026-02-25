@@ -3,7 +3,6 @@ import re
 from typing import Union
 from src.utils.log import setup_logger
 from src.v1.service.user import UserService
-from src.v1.auth.service import encrypt_token, decrypt_token
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.auth.twitter_auth import TwitterAuthService
 

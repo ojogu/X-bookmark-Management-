@@ -11,6 +11,9 @@ from src.v1.base.exception import InvalidToken
 from src.utils.log import setup_logger
 logger = setup_logger(__name__, file_path="auth.log")
 
+def encryption_key():
+    cipher = Fernet(config.encryption_key)
+    return cipher
 
 def encrypt_token(token: str) -> str:
     """
@@ -22,7 +25,7 @@ def encrypt_token(token: str) -> str:
     Returns:
         Encrypted token as a string
     """
-    cipher = auth_service.encryption_key()
+    cipher = encryption_key()
 
     # 1. Prepare the data
     raw_token = token.encode()
@@ -45,19 +48,28 @@ def decrypt_token(encrypted_token: str) -> str:
 
     Returns:
         Decrypted token as a string
+        
+    Raises:
+        Exception: If decryption fails
     """
-    cipher = auth_service.encryption_key()
+    try:
+        cipher = encryption_key()
 
-    # 1. Prepare the encrypted data
-    encrypted_bytes = encrypted_token.encode()
+        # 1. Prepare the encrypted data
+        encrypted_bytes = encrypted_token.encode()
 
-    # 2. Decrypt it
-    decrypted_bytes = cipher.decrypt(encrypted_bytes)
+        # 2. Decrypt it
+        decrypted_bytes = cipher.decrypt(encrypted_bytes)
 
-    # 3. Convert to string
-    decrypted_token = decrypted_bytes.decode('utf-8')
+        # 3. Convert to string
+        decrypted_token = decrypted_bytes.decode('utf-8')
 
-    return decrypted_token
+        logger.info("Token decrypted successfully")
+        return decrypted_token
+        
+    except Exception as e:
+        logger.error(f"Error decrypting token: {str(e)}", exc_info=True)
+        raise
 
 
 class AuthService():

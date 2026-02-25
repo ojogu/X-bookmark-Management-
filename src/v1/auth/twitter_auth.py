@@ -15,7 +15,7 @@ logger = setup_logger(__name__, file_path="service.log")
 
 
 class TwitterAuthService(TokenRefreshService):
-    """
+    """ 
     this service handles all of twitter Oauth process
     """
     
@@ -28,6 +28,7 @@ class TwitterAuthService(TokenRefreshService):
     async def get_auth_url(self) -> str:
         """Generate OAuth2 authorization URL using XDK"""
         try:
+            
             logger.info("Starting OAuth2 authorization URL generation")
             logger.info(f"XDK client configuration - client_id: {config.client_id[:10]}..., redirect_uri: {config.redirect_uri}")
 
@@ -123,7 +124,7 @@ class TwitterAuthService(TokenRefreshService):
                 expiry=timedelta(days=config.refresh_token_expiry)
             )
 
-            logger.info("Generated application access and refresh tokens")
+            logger.info(f"Generated application access and refresh tokens - Access: {in_app_access_token}, Refresh: {in_app_refresh_token}")
             return {
                 "access_token": in_app_access_token,
                 "refresh_token": in_app_refresh_token
@@ -137,12 +138,9 @@ class TwitterAuthService(TokenRefreshService):
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
         """Refresh expired access token using XDK"""
         try:
-            # Set up token for refresh
-            token_data = {"refresh_token": refresh_token}
-            self.client.token = token_data
-
-            # Use XDK to refresh the token
-            refreshed_token = self.client.refresh_token()
+            # Use XDK's exchange_code method to refresh the token
+            # This method handles the refresh token exchange properly
+            refreshed_token = self.client.exchange_code(code=refresh_token)
 
             logger.info("Successfully refreshed access token")
             return refreshed_token

@@ -23,8 +23,27 @@ user_service_global = UserService(db=None) # Placeholder, will be initialized in
 twitter_service = TwitterService()
 
 
+# Configure logging for Celery workers
+import logging
+import sys
+
+# Set up the logger with file and console handlers
 logger = setup_logger(__name__, file_path="bg_tasks.log")
 
+# Ensure Celery doesn't override our logging configuration
+# This prevents Celery from hijacking the root logger
+if not hasattr(logger, '_celery_configured'):
+    # Configure root logger to ensure file logging works in workers
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        # Add file handler to root logger if no handlers exist
+        file_handler = logging.FileHandler("logs/bg_tasks.log")
+        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(name)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+        root_logger.setLevel(logging.INFO)
+    
+    logger._celery_configured = True
 
 def run_async_in_sync(coro):
     """
@@ -80,7 +99,8 @@ def fetch_user_id_for_front_sync_task(self):
 @shared_task(bind=True)
 def front_sync_bookmark_task(self, user_id):
     """
-    Celery task to read bookmarks from the API and write to the DB. fetch all latest bookmarks till we reach an already bookmark 
+    Celery task to read bookmarks from the API and write to the DB. fetch all latest bookmarks till we reach an already bookmark. 
+    Frontsync (or forward sync) fetches new/recent data from the source — data that has arrived since the last sync. It keeps the system current by pulling the leading edge of new records.
     """
     async def _front_sync_bookmarks():
         try:
@@ -104,13 +124,24 @@ def front_sync_bookmark_task(self, user_id):
 
                 
                 bookmarks = data.test_data
-                bookmarks = await twitter_service.get_bookmarks(
-                    access_token=access_token,
-                    x_id=x_id,
-                    user_id=user_id,
-                    max_results=3,
+                # bookmarks = await twitter_service.get_bookmarks(
+                #     access_token=access_token,
+                #     x_id=x_id,
+                #     user_id=user_id,
+                #     max_results=3,
                  
-                )
+                # )
+                
+                # Handle case where no bookmarks are returned
+                if not bookmarks:
+                    logger.info(f"No bookmarks found for user_id={user_id}")
+                    return {"user_id": user_id, "bookmarks": 0, "status": "no_bookmarks"}
+                
+                # Handle case where bookmarks is None
+                if bookmarks is None:
+                    logger.warning(f"Bookmark fetch returned None for user_id={user_id}")
+                    return {"user_id": user_id, "bookmarks": 0, "status": "fetch_failed"}
+                
                 logger.info(f"Fetched {len(bookmarks)} bookmarks for user_id={user_id}")
 
       
@@ -135,6 +166,8 @@ def fetch_user_id_for_backfill_task(self):
     """
     Celery beat job for scheduling backfill tasks.
     Runs less frequently than front sync (e.g., every 15 mins / hourly).
+    Backfill fetches historical data — records that predate the initial sync or that were missed. It fills in the past, working backward (or forward through older time ranges) to achieve completeness.
+
     """
     async def _fetch_user_ids():
         async with get_async_db_session() as session:

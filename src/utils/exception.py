@@ -265,7 +265,7 @@ def register_error_handlers(app: FastAPI):
     """
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        exception_logger.error(f"HTTP {exc.status_code}: {exc.detail}")
+        exception_logger.error(f"HTTP {exc.status_code}: {exc.detail}", exc_info=True)
         return JSONResponse(
             content={
                 "status": "error",
@@ -342,7 +342,7 @@ def register_error_handlers(app: FastAPI):
 
     @app.exception_handler(500)
     async def internal_server_error(request: Request, exc: Exception):
-        exception_logger.error(f"Internal server error: {str(exc)}")
+        exception_logger.error(f"Internal server error: {str(exc)}", exc_info=True)
         return JSONResponse(
             content={
                 "status": "error",

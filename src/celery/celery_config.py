@@ -94,6 +94,10 @@ class CeleryConfig:
     worker_log_color = False
     worker_send_task_events = True
     task_send_sent_event = True
+    
+    # Ensure logging configuration is preserved
+    worker_log_format = '[%(asctime)s] [%(levelname)s] %(name)s - %(message)s'
+    worker_task_log_format = '[%(asctime)s] [%(levelname)s] %(name)s - %(message)s'
 
 
 
