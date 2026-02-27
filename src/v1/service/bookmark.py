@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 from .utils import _clean_structure, read_json_file
 
@@ -70,6 +70,7 @@ class BookmarkService():
     
     
     async def fetch_next_token(self, db:AsyncSession, user_id):
+        """Fetch the next_token for backfill pagination."""
         next_token = await db.execute(
             sa.select(BookmarkModel.next_token).where(
                 user_id == BookmarkModel.user_id
@@ -79,7 +80,27 @@ class BookmarkService():
             return None
         return next_token.scalar_one_or_none()
     
-    async def save_bookmarks(self, db: AsyncSession, user_id: str, api_response: Dict[str, Any]):
+    async def get_last_sync_time(self, db:AsyncSession, user_id):
+        """Get the last successful front sync timestamp for a user."""
+        result = await db.execute(
+            sa.select(User.last_front_sync_time).where(
+                user_id == User.id
+            )
+        )
+        if not result:
+            return None
+        return result.scalar_one_or_none()
+    
+    async def update_last_sync_time(self, db:AsyncSession, user_id, sync_time: datetime):
+        """Update the last sync time after successful front sync."""
+        await db.execute(
+            sa.update(User)
+            .where(User.id == user_id)
+            .values(last_front_sync_time=sync_time)
+        )
+        await db.commit()
+    
+    async def save_bookmarks(self, db: AsyncSession, user_id: str, api_response: Dict[str, Any], next_token: Optional[str] = None, sync_time: Optional[datetime] = None):
         """
         Full pipeline to parse Twitter bookmarks API response and save to DB.
 
@@ -87,22 +108,23 @@ class BookmarkService():
             db: SQLAlchemy db object
             user_id: ID of the user whose bookmarks these are
             api_response: Raw JSON response from Twitter API
+            next_token: Pagination token for backfill operations
+            sync_time: Timestamp to update last_front_sync_time
         """
         logger.info(f"Starting bookmark save pipeline for user_id={user_id}")
         
-        #check if user exists
+        # Check if user exists
         logger.debug(f"Checking if user {user_id} exists")
         user = await self.user_service.check_if_user_exists_user_id(user_id)
         if not user:
             logger.error(f"User {user_id} not found")
-            raise NotFoundError(f"user: {user_id} does not exists" )
+            raise NotFoundError(f"user: {user_id} does not exists")
         
         # Parse & validate API response using Pydantic
         logger.debug(f"Parsing API response for user {user_id}")
         validated_response = BookmarkService.parse_bookmarks_response(api_response, user_id)
         logger.info(f"Found {len(validated_response.bookmarks)} bookmarks to process for user {user_id}")
         
-        logger.info(f"parsed data: {validated_response}")
         # Iterate through bookmarks and upsert data
         for index, bm in enumerate(validated_response.bookmarks, 1):
             logger.debug(f"Processing bookmark {index}/{len(validated_response.bookmarks)}")
@@ -111,13 +133,13 @@ class BookmarkService():
 
             # ---- Handle Author ----
             logger.debug(f"Checking author {author_data['id']}")
-            author = await self.check_if_author_exists(db,author_data['id'])
+            author = await self.check_if_author_exists(db, author_data['id'])
             if not author:
                 logger.debug(f"Creating new author record for {author_data['id']}")
                 author = AuthorModel(
                     username=author_data.get('username', ''),
                     name=author_data.get('name', ''),
-                    profile_image_url = str(author_data.get('profile_image_url', '')),
+                    profile_image_url=str(author_data.get('profile_image_url', '')),
                     author_id_from_x=author_data.get('id', '')
                 )
                 db.add(author)
@@ -125,7 +147,7 @@ class BookmarkService():
 
             # ---- Handle Post ----
             logger.debug(f"Checking post {post_data['id']}")
-            post = await self.check_if_post_exists(db,post_data['id'])
+            post = await self.check_if_post_exists(db, post_data['id'])
             if not post:
                 logger.debug(f"Creating new post record for {post_data['id']}")
                 post = PostModel(
@@ -148,9 +170,18 @@ class BookmarkService():
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
-                    next_token=validated_response.meta.next_token
+                    next_token=next_token  # Store the pagination token
                 )
                 db.add(bookmark)
+
+        # Update user's last sync time if provided
+        if sync_time:
+            logger.debug(f"Updating last_front_sync_time for user {user_id} to {sync_time}")
+            await db.execute(
+                sa.update(User)
+                .where(User.id == user_id)
+                .values(last_front_sync_time=sync_time)
+            )
 
         # Commit all changes
         try:

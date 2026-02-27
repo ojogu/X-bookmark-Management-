@@ -25,7 +25,14 @@ class Bookmark(BaseModel):
     user = relationship("User", backref="bookmarks")
     post = relationship("Post", backref="bookmarks")
 
-
+    #tokens for sync
+    front_sync_anchor = sa.Column(sa.DateTime, nullable=True)
+    front_sync_token = sa.Column(sa.String, nullable=True)
+    
+    #backfill 
+    next_token = sa.Column(sa.String, nullable=False)
+    is_backfill_complete = sa.Column(sa.Boolean, default=False)
+    
 
 class Folder(BaseModel):
     __tablename__ = "folders"

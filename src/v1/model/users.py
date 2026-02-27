@@ -11,6 +11,7 @@ class User(BaseModel):
     profile_image_url = sa.Column(sa.String, nullable=False)
     name = sa.Column(sa.String, nullable=False)
     username = sa.Column(sa.String, unique=True, nullable=False)
+    last_front_sync_time = sa.Column(sa.DateTime, nullable=True)
     #relationship 
     token = relationship("UserToken", uselist=False, back_populates="user")
 
