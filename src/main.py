@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.utils.config import Settings, config
 from src.utils.exception import register_error_handlers
 from src.v1.route.twitter import twitter_router
+
 @asynccontextmanager
 async def life_span(app: FastAPI):
     """
