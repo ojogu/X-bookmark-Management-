@@ -2,17 +2,45 @@
 import logging
 import os
 from rich.logging import RichHandler  # Rich handler for colored console output
+from pythonjsonlogger import json as jsonlogger
 
 # Determine the root directory of the project. 
-# Assumes this script is in: api/utils/log_util.py
+# Assumes this script is in: src/utils/log.py
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOGS_DIR = os.path.join(ROOT_DIR, "logs")
+
+
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    """
+    Custom JSON formatter that includes standard fields and handles exceptions.
+    Output format:
+    {
+        "timestamp": "2026-02-27T20:00:00.123456+01:00",
+        "level": "INFO",
+        "logger": "src.v1.service.twitter",
+        "message": "Fetching bookmarks for user_id: 12345",
+        "exception": "..."  # Only present if there's an exception
+    }
+    """
+    
+    def add_fields(self, log_record: dict, record: logging.LogRecord, message_dict: dict):
+        super().add_fields(log_record, record, message_dict)
+        
+        # Add standard fields
+        log_record['timestamp'] = self.formatTime(record, self.datefmt)
+        log_record['level'] = record.levelname
+        log_record['logger'] = record.name
+        
+        # Handle exception info
+        if record.exc_info:
+            log_record['exception'] = self.formatException(record.exc_info)
+            log_record['exc_type'] = record.exc_info[0].__name__ if record.exc_info[0] else None
 
 
 def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> logging.Logger:
     """
     Sets up a logger with:
-    - File logging (plain text, no color)
+    - File logging (JSON format for structured logging)
     - RichHandler for colored console output
     Only sets up handlers once per logger.
 
@@ -31,15 +59,17 @@ def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> logging.Logg
     if not logger.handlers:
         os.makedirs(LOGS_DIR, exist_ok=True)
 
-        # Setup file handler (logs to logs/<file_path>)
+        # Setup file handler (JSON logs to logs/<file_path>)
         log_file_path = os.path.join(LOGS_DIR, file_path)
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setLevel(level)
-        file_formatter = logging.Formatter(
-            '[%(asctime)s] [%(levelname)s] %(name)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+        
+        # Use JSON formatter for file output
+        json_formatter = CustomJsonFormatter(
+            timestamp=True,
+            datefmt='%Y-%m-%dT%H:%M:%S%z'
         )
-        file_handler.setFormatter(file_formatter)
+        file_handler.setFormatter(json_formatter)
 
         # Setup rich console handler (colored, timestamped output)
         console_handler = RichHandler(
