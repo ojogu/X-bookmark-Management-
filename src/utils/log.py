@@ -92,16 +92,16 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             clear_contextvars()
 
 
-def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> structlog.BoundLogger:
+def setup_logger(name: str, file_path: str = "app.log", level=logging.DEBUG) -> structlog.BoundLogger:
     """
     Sets up a structlog logger with:
-    - File logging (JSON format for structured logging)
+    - Single centralized file logging (JSON format for structured logging)
     - RichHandler for colored console output
     - Request-scoped context binding
 
     Args:
         name (str): Logger name (usually module name).
-        file_path (str): Log file name to store logs.
+        file_path (str): Log file name (default: "app.log" - all services use same file).
         level (int): Logging level (e.g., logging.INFO).
 
     Returns:
@@ -110,7 +110,7 @@ def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> structlog.Bo
     # Create structlog logger
     logger = structlog.get_logger(name)
     
-    # Setup file handler for structured logging
+    # Setup single centralized file handler for all services
     os.makedirs(LOGS_DIR, exist_ok=True)
     log_file_path = os.path.join(LOGS_DIR, file_path)
     
@@ -122,42 +122,20 @@ def setup_logger(name: str, file_path: str, level=logging.DEBUG) -> structlog.Bo
     json_formatter = structlog.processors.JSONRenderer()
     file_handler.setFormatter(logging.Formatter("%(message)s"))
     
-    # Add a processor to handle the file output
-    file_logger = structlog.wrap_logger(
-        logging.getLogger(name),
-        processors=[
-            merge_contextvars,
-            add_log_level,
-            add_logger_name,
-            TimeStamper(fmt="iso"),
-            json_formatter,
-        ]
-    )
-    
-    # Setup rich console handler (colored, timestamped output)
-    console_handler = RichHandler(
-        rich_tracebacks=True,     # Enable colorful tracebacks
-        show_time=True,           # Show time column
-        show_level=True,          # Show level column
-        show_path=True            # Show path to source
-    )
-    console_handler.setLevel(level)
-    
     # Get the underlying stdlib logger for handler management
-    stdlib_logger = logging.getLogger(name)
+    stdlib_logger = logging.getLogger()
     stdlib_logger.setLevel(level)
     
     # Avoid adding multiple handlers on repeated calls
     if not stdlib_logger.handlers:
         stdlib_logger.addHandler(file_handler)
-        stdlib_logger.addHandler(console_handler)
     
     return logger
 
 
 def get_logger(name: str) -> structlog.BoundLogger:
     """
-    Get a structlog logger instance.
+    Get a structlog logger instance with file logging configured.
     
     Args:
         name (str): Logger name (usually module name).
@@ -165,6 +143,27 @@ def get_logger(name: str) -> structlog.BoundLogger:
     Returns:
         structlog.BoundLogger: Configured structlog logger instance.
     """
+    # Ensure the logs directory exists
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    log_file_path = os.path.join(LOGS_DIR, "app.log")
+    
+    # Get the root logger and ensure it has a file handler
+    root_logger = logging.getLogger()
+    
+    # Check if we already have a file handler for app.log
+    has_file_handler = any(
+        isinstance(handler, logging.FileHandler) and 
+        handler.baseFilename == log_file_path
+        for handler in root_logger.handlers
+    )
+    
+    if not has_file_handler:
+        # Add file handler to root logger
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter("%(message)s"))
+        root_logger.addHandler(file_handler)
+    
     return structlog.get_logger(name)
 
 
