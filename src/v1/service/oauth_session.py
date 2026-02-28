@@ -2,9 +2,9 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from src.utils.redis import get_redis
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 
-logger = setup_logger(__name__, file_path="redis_service.log")
+logger = get_logger(__name__)
 
 # Redis configuration
 OAUTH_SESSION_TTL = 600  # 10 minutes - just for OAuth flow

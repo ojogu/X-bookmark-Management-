@@ -5,11 +5,11 @@ from src.v1.base.model import Base, BaseModel
 from src.v1 import model
 from .config import config
 from sqlalchemy.exc import SQLAlchemyError
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from sqlalchemy.pool import NullPool
 from contextlib import asynccontextmanager
 
-logger = setup_logger(__name__, file_path="error.log")
+logger = get_logger(__name__)
 
 # Create async engine
 engine = create_async_engine(

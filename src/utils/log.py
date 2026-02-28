@@ -1,182 +1,137 @@
 import logging
 import os
 import sys
+import uuid
 import structlog
-from structlog.stdlib import add_log_level, add_logger_name
-from structlog.processors import JSONRenderer, TimeStamper, StackInfoRenderer, format_exc_info
-from structlog.dev import ConsoleRenderer
-from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
-from rich.logging import RichHandler
-from typing import Optional, Dict, Any
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-import uuid
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
-# Determine the root directory of the project. 
-# Assumes this script is in: src/utils/log.py
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 
-# Configure structlog
-def configure_structlog():
-    """Configure structlog with appropriate processors and renderers"""
-    
-    # Check if we're in development mode
-    is_dev = os.getenv("ENVIRONMENT", "development").lower() in ["development", "dev", "local"]
-    
-    # Common processors for all environments
-    processors = [
-        structlog.contextvars.merge_contextvars,  # Merge context variables
-        structlog.stdlib.add_log_level,           # Add log level
-        structlog.stdlib.add_logger_name,         # Add logger name
-        structlog.processors.StackInfoRenderer(), # Add stack info
-        structlog.processors.format_exc_info,     # Format exceptions
-        structlog.processors.TimeStamper(fmt="iso"),  # Add timestamp
-    ]
-    
-    if is_dev:
-        # Development: Human-readable console output
-        processors.append(
-            structlog.dev.ConsoleRenderer(
-                colors=True,
-                exception_formatter=structlog.dev.plain_traceback,
-            )
-        )
-    else:
-        # Production: JSON output
-        processors.append(
-            structlog.processors.JSONRenderer()
-        )
-    
-    # Configure structlog
+# ---------------------------------------------------------------------------
+# Shared pre-render processors (run before the final renderer)
+# These are format-agnostic — they add metadata to the event dict.
+# ---------------------------------------------------------------------------
+SHARED_PROCESSORS = [
+    structlog.contextvars.merge_contextvars,      # Inject request-scoped context
+    structlog.stdlib.add_log_level,               # "level": "info"
+    structlog.stdlib.add_logger_name,             # "logger": "src.v1.service.user"
+    structlog.processors.TimeStamper(fmt="iso"),  # "timestamp": "2026-02-28T..."
+    structlog.processors.StackInfoRenderer(),     # Stack info if present
+    structlog.processors.format_exc_info,         # Clean exception formatting
+]
+
+
+def configure_structlog() -> None:
+    """
+    Configure structlog with two output pipelines:
+      - Console (stdout): ConsoleRenderer with colors (dev) or plain JSON (prod)
+      - File (logs/app.log): Always clean JSON, no ANSI codes
+
+    The key pattern: structlog renders nothing itself. It hands off to
+    ProcessorFormatter which runs the final renderer per-handler.
+    """
+    is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "local")
+
+    # structlog is configured to stop just before rendering.
+    # ProcessorFormatter (attached to each handler) does the final render.
     structlog.configure(
-        processors=processors,
+        processors=[
+            *SHARED_PROCESSORS,
+            # Hand off to stdlib logging — ProcessorFormatter takes it from here
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
-    
-    # Configure stdlib logging to work with structlog
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=logging.INFO if is_dev else logging.WARNING,
-    )
 
-# Initialize structlog configuration
+    # --- Console handler ---
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        # foreign_pre_chain handles log records from stdlib loggers (uvicorn, etc.)
+        foreign_pre_chain=SHARED_PROCESSORS,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer(colors=is_dev),  # No colors in prod
+        ],
+    )
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(console_formatter)
+
+    # --- File handler: always clean JSON, never ANSI ---
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    file_formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=SHARED_PROCESSORS,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(),  # Pure JSON, no color codes
+        ],
+    )
+    file_handler = logging.FileHandler(os.path.join(LOGS_DIR, "app.log"))
+    file_handler.setFormatter(file_formatter)
+
+    # --- Root logger: wire both handlers ---
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()  # Remove any handlers added before this call
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
+    root_logger.setLevel(logging.DEBUG if is_dev else logging.INFO)
+
+    # Quiet noisy third-party loggers
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+# Run once at import time
 configure_structlog()
 
 
+# ---------------------------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------------------------
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    """FastAPI middleware to add request-scoped context to structlog"""
-    
+    """Binds request-scoped context to structlog for the lifetime of each request."""
+
     async def dispatch(self, request: Request, call_next):
-        # Generate or extract request_id
-        request_id = request.headers.get("X-Request-ID")
-        if not request_id:
-            request_id = str(uuid.uuid4())
-        
-        # Bind request context to structlog
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+
         bind_contextvars(
             request_id=request_id,
             method=request.method,
-            path=request.url.path
+            path=request.url.path,
         )
-        
         try:
             response = await call_next(request)
             return response
         finally:
-            # Clear context at request end
             clear_contextvars()
 
 
-def setup_logger(name: str, file_path: str = "app.log", level=logging.DEBUG) -> structlog.BoundLogger:
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """
-    Sets up a structlog logger with:
-    - Single centralized file logging (JSON format for structured logging)
-    - RichHandler for colored console output
-    - Request-scoped context binding
+    Get a structlog logger. Context bound via middleware or bind_context()
+    is automatically merged into every log line.
 
-    Args:
-        name (str): Logger name (usually module name).
-        file_path (str): Log file name (default: "app.log" - all services use same file).
-        level (int): Logging level (e.g., logging.INFO).
-
-    Returns:
-        structlog.BoundLogger: Configured structlog logger instance.
+    Usage:
+        log = get_logger(__name__)
+        log.info("user.created", user_id=42)
     """
-    # Create structlog logger
-    logger = structlog.get_logger(name)
-    
-    # Setup single centralized file handler for all services
-    os.makedirs(LOGS_DIR, exist_ok=True)
-    log_file_path = os.path.join(LOGS_DIR, file_path)
-    
-    # Configure file handler with JSON formatter
-    file_handler = logging.FileHandler(log_file_path)
-    file_handler.setLevel(level)
-    
-    # Use JSON formatter for file output
-    json_formatter = structlog.processors.JSONRenderer()
-    file_handler.setFormatter(logging.Formatter("%(message)s"))
-    
-    # Get the underlying stdlib logger for handler management
-    stdlib_logger = logging.getLogger()
-    stdlib_logger.setLevel(level)
-    
-    # Avoid adding multiple handlers on repeated calls
-    if not stdlib_logger.handlers:
-        stdlib_logger.addHandler(file_handler)
-    
-    return logger
-
-
-def get_logger(name: str) -> structlog.BoundLogger:
-    """
-    Get a structlog logger instance with file logging configured.
-    
-    Args:
-        name (str): Logger name (usually module name).
-    
-    Returns:
-        structlog.BoundLogger: Configured structlog logger instance.
-    """
-    # Ensure the logs directory exists
-    os.makedirs(LOGS_DIR, exist_ok=True)
-    log_file_path = os.path.join(LOGS_DIR, "app.log")
-    
-    # Get the root logger and ensure it has a file handler
-    root_logger = logging.getLogger()
-    
-    # Check if we already have a file handler for app.log
-    has_file_handler = any(
-        isinstance(handler, logging.FileHandler) and 
-        handler.baseFilename == log_file_path
-        for handler in root_logger.handlers
-    )
-    
-    if not has_file_handler:
-        # Add file handler to root logger
-        file_handler = logging.FileHandler(log_file_path)
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(logging.Formatter("%(message)s"))
-        root_logger.addHandler(file_handler)
-    
     return structlog.get_logger(name)
 
 
-def bind_context(**kwargs):
-    """
-    Bind additional context variables to the current logger context.
-    
-    Args:
-        **kwargs: Key-value pairs to bind to the context.
-    """
+def bind_context(**kwargs) -> None:
+    """Bind extra key-value pairs to the current request context."""
     bind_contextvars(**kwargs)
 
 
-def clear_context():
-    """Clear all context variables."""
+def clear_context() -> None:
+    """Clear all context variables (called automatically by middleware)."""
     clear_contextvars()
