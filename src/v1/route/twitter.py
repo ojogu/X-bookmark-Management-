@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from src.v1.auth.service import AccessTokenBearer, auth_service
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
@@ -28,7 +28,7 @@ from src.v1.base.exception import (
     
 )
 access_token_bearer = AccessTokenBearer()
-logger = setup_logger(__name__, file_path="auth.log")
+logger = get_logger(__name__)
 
 twitter_router = APIRouter(prefix="/X")
 

@@ -9,8 +9,8 @@ from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
 from datetime import timedelta
 
-from src.utils.log import setup_logger
-logger = setup_logger(__name__, file_path="service.log")
+from src.utils.log import get_logger
+logger = get_logger(__name__)
 
 
 

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.utils.config import Settings, config
 from src.utils.exception import register_error_handlers
 from src.v1.route.twitter import twitter_router
+from src.utils.log import RequestContextMiddleware
 @asynccontextmanager
 async def life_span(app: FastAPI):
     """
@@ -53,6 +54,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request context middleware for structlog
+app.add_middleware(RequestContextMiddleware)
 
 #register error handlers 
 register_error_handlers(app)

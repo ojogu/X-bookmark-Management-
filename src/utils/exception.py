@@ -26,8 +26,8 @@ from src.v1.base.exception import (
     
     
 )
-from src.utils.log import setup_logger
-exception_logger = setup_logger(__name__, file_path="error.log")
+from src.utils.log import get_logger
+exception_logger = get_logger(__name__)
 
 
 

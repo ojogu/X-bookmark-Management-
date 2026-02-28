@@ -4,8 +4,8 @@ import redis.asyncio as redis
 from typing import Optional
 from src.utils.config import config
 
-from src.utils.log import setup_logger
-logger = setup_logger(__name__, "redis.log")
+from src.utils.log import get_logger
+logger = get_logger(__name__)
 
 CACHE_TTL = 300
 REDIS_URL = config.redis_url

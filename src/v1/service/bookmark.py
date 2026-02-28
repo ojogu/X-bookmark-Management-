@@ -28,8 +28,8 @@ from src.v1.base.exception import (
 )
 
 
-from src.utils.log import setup_logger
-logger = setup_logger(__name__, file_path="bookmark.log")
+from src.utils.log import get_logger
+logger = get_logger(__name__)
 
 
 

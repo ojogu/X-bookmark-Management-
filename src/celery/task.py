@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from celery import shared_task
 import concurrent
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from .celery import bg_task
 from src.v1.service.twitter import TwitterService 
 from src.v1.service.user import UserService 
@@ -12,6 +12,7 @@ from src.utils.db import get_async_db_session
 from src.v1.service.bookmark import BookmarkService
 from src.v1.service import data 
 from datetime import datetime
+import logging
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_log, after_log
 
 # @asynccontextmanager
@@ -26,27 +27,8 @@ user_service_global = UserService(db=None) # Placeholder, will be initialized in
 twitter_service = TwitterService()
 
 
-# Configure logging for Celery workers
-import logging
-import sys
-
-# Set up the logger with file and console handlers
-logger = setup_logger(__name__, file_path="bg_tasks.log")
-
-# Ensure Celery doesn't override our logging configuration
-# This prevents Celery from hijacking the root logger
-if not hasattr(logger, '_celery_configured'):
-    # Configure root logger to ensure file logging works in workers
-    root_logger = logging.getLogger()
-    if not root_logger.handlers:
-        # Add file handler to root logger if no handlers exist
-        file_handler = logging.FileHandler("logs/bg_tasks.log")
-        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(name)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        root_logger.addHandler(file_handler)
-        root_logger.setLevel(logging.INFO)
-    
-    logger._celery_configured = True
+# Configure logging for Celery workers using structlog
+logger = get_logger(__name__)
 
 def run_async_in_sync(coro):
     """

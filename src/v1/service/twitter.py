@@ -1,9 +1,9 @@
 from src.v1.service.bookmark import BookmarkService
 from src.utils.xdk_client import xdk_client
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
 
-logger = setup_logger(__name__, file_path="twitter_service.log")
+logger = get_logger(__name__)
 
 class TwitterService:
     """

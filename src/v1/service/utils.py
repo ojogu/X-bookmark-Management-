@@ -1,13 +1,13 @@
 import json
 import re
 from typing import Union
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from src.v1.service.user import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.auth.twitter_auth import TwitterAuthService
 
 
-logger = setup_logger(__name__, file_path="auth.log")
+logger = get_logger(__name__)
 
 
 

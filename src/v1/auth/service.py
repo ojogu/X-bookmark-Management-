@@ -8,8 +8,8 @@ from src.v1.base.exception import TokenExpired
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 from src.v1.base.exception import InvalidToken
 
-from src.utils.log import setup_logger
-logger = setup_logger(__name__, file_path="auth.log")
+from src.utils.log import get_logger
+logger = get_logger(__name__)
 
 def encryption_key():
     cipher = Fernet(config.encryption_key)

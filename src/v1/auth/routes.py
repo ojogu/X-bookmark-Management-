@@ -6,7 +6,7 @@ from src.utils.redis import key_exist, set_cache
 from src.utils.response import success_response
 from src.v1.base.exception import InvalidToken
 # from .schema import Webhook
-from src.utils.log import setup_logger
+from src.utils.log import get_logger
 from src.v1.route.dependencies import get_user_service, get_twitter_client
 from .twitter_auth import TwitterAuthService
 from src.utils.config import config
@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 from src.v1.auth.service import RefreshTokenBearer, auth_service
 from datetime import datetime
 auth_router = APIRouter(prefix="/auth")
-logger = setup_logger(__name__, file_path="auth.log")
+logger = get_logger(__name__)
 
 
 @auth_router.get("/login", status_code=status.HTTP_200_OK)
