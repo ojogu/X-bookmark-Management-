@@ -138,9 +138,9 @@ class TwitterAuthService(TokenRefreshService):
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
         """Refresh expired access token using XDK"""
         try:
-            # Use XDK's exchange_code method to refresh the token
-            # This method handles the refresh token exchange properly
-            refreshed_token = self.client.exchange_code(code=refresh_token)
+            # Use XDK's refresh_token method instead of exchange_code
+            # This method handles refresh token exchange properly without requiring PKCE
+            refreshed_token = self.client.refresh_token(refresh_token)
 
             logger.info("Successfully refreshed access token")
             return refreshed_token
