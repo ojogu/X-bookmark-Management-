@@ -258,8 +258,8 @@ class UserService():
                 user_tokens = tokens
 
             return {
-                "access_token": user_tokens["access_token"],
-                "user_id": user_tokens["user_id"],
+                "access_token": user_tokens["access_token"] if isinstance(user_tokens, dict) else user_tokens.access_token,
+                "user_id": user_tokens["user_id"] if isinstance(user_tokens, dict) else user_tokens.user_id,
                 "x_id": x_id
             }
             

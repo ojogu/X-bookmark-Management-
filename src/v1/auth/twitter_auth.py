@@ -8,7 +8,8 @@ from src.v1.service.interfaces import TokenRefreshService
 from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
 from datetime import timedelta
-
+import base64
+import httpx
 from src.utils.log import get_logger
 logger = get_logger(__name__)
 
@@ -136,18 +137,42 @@ class TwitterAuthService(TokenRefreshService):
 
 
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
-        """Refresh expired access token using XDK"""
+        """Refresh expired access token using direct Twitter API v2"""
         try:
-            # Use XDK's refresh_token method instead of exchange_code
-            # This method handles refresh token exchange properly without requiring PKCE
-            refreshed_token = self.client.refresh_token(refresh_token)
+            token_url = "https://api.twitter.com/2/oauth2/token"
 
-            logger.info("Successfully refreshed access token")
-            return refreshed_token
+            credentials = f"{config.client_id}:{config.client_secret}"
+            encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
+            headers = {
+                "Authorization": f"Basic {encoded_credentials}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+
+            data = {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(token_url, headers=headers, data=data)
+
+                if response.status_code == 200:
+                    token_response = response.json()
+                    logger.info("Successfully refreshed access token")
+                    logger.info(f"new tokens: {token_response}")
+                    return token_response
+                else:
+                    logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+                    raise Exception(f"Token refresh failed: {response.status_code} - {response.text}")
+
+        except httpx.RequestError as e:
+            logger.error(f"Network error during token refresh: {e}")
+            raise Exception(f"Network error during token refresh: {e}")
         except Exception as e:
-            logger.error(f"Token refresh failed: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during token refresh: {e}")
             raise
+
 
             
     

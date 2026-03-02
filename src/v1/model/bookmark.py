@@ -30,7 +30,7 @@ class Bookmark(BaseModel):
     front_sync_token = sa.Column(sa.String, nullable=True)
     
     #backfill 
-    next_token = sa.Column(sa.String, nullable=False)
+    next_token = sa.Column(sa.String, nullable=False, default="")
     is_backfill_complete = sa.Column(sa.Boolean, default=False)
     
 

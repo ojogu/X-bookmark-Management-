@@ -170,7 +170,8 @@ class BookmarkService():
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
-                    next_token=next_token  # Store the pagination token
+                    front_sync_token=next_token if sync_time else None,  # Use front_sync_token for front sync operations
+                    next_token=next_token or ""  # Set default empty string for front sync, actual token for backfill
                 )
                 db.add(bookmark)
 
