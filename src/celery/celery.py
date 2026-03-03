@@ -4,38 +4,37 @@ from celery.schedules import crontab
 from src.utils.config import config
 from datetime import timedelta
 
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
+from src.utils.telemetry import setup_telemetry 
+
 bg_task = Celery(
     "src",
     include=["src.celery.task"]
 )
 
 bg_task.conf.update(
-    # Important for async tasks
     task_always_eager=False,
 )
 bg_task.conf.broker_connection_retry_on_startup = True
 
 bg_task.config_from_object(CeleryConfig)
 
-interval = config.celery_beat_interval
-#configure celery beat
-bg_task.conf.beat_schedule = {
-        # Task 1: fetch all users_id every 30 minutes
-    'get-all-front_sync_users-id': {
-        'task': 'src.celery.task.fetch_user_id_for_front_sync_task',  # Task function, must be decorated with celery
-        'schedule':timedelta(minutes=interval)
-        }, #every 2 mins
-    
-    #task 2
-    'get-all-backfill_users-id': {
-        'task': 'src.celery.task.fetch_user_id_for_backfill_task',  # Task function, must be decorated with celery
-        'schedule':timedelta(minutes=15) #every 10 mins
-        
-        
-    },
-    
-}
+# ── OpenTelemetry ─────────────────────────────────────────────────
+setup_telemetry(service_name="xmarks-worker")  # distinct name from your API
+CeleryInstrumentor().instrument()
+# ─────────────────────────────────────────────────────────────────
 
+interval = config.celery_beat_interval
+bg_task.conf.beat_schedule = {
+    'get-all-front_sync_users-id': {
+        'task': 'src.celery.task.fetch_user_id_for_front_sync_task',
+        'schedule': timedelta(minutes=interval)
+    },
+    'get-all-backfill_users-id': {
+        'task': 'src.celery.task.fetch_user_id_for_backfill_task',
+        'schedule': timedelta(minutes=15)
+    },
+}
 
 # Schedule,Crontab Code,Description
 # Every 2 minutes,crontab(minute='*/2'),"12:00, 12:02, 12:04..."

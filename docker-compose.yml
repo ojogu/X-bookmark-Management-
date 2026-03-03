@@ -1,6 +1,18 @@
 name: Xmarks
 
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  grafana_data:
+  loki_data:
+  tempo_data:
+  prometheus_data:
+
 services:
+  # ── App Services ─────────────────────────────────────────────────
+
   backend:
     build:
       context: .
@@ -12,10 +24,13 @@ services:
     depends_on:
       - cache
       - queue
+      - otel-collector
     volumes:
-      - ./logs:/app/logs 
-      - ./src:/app/src 
+      - ./logs:/app/logs
+      - ./src:/app/src
     command: uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload
+    networks:
+      - observability
 
   worker:
     build: .
@@ -25,9 +40,12 @@ services:
     depends_on:
       - cache
       - queue
+      - otel-collector
     volumes:
       - ./logs:/app/logs
       - ./src:/app/src
+    networks:
+      - observability
 
   celery_beat:
     build: .
@@ -37,6 +55,8 @@ services:
     depends_on:
       - cache
       - queue
+    networks:
+      - observability
 
   flower:
     build: .
@@ -48,6 +68,8 @@ services:
     depends_on:
       - cache
       - queue
+    networks:
+      - observability
 
   cache:
     image: redis:7-alpine
@@ -58,12 +80,16 @@ services:
       retries: 5
     ports:
       - "6800:6379"
+    networks:
+      - observability
 
   queue:
     image: rabbitmq:3.13-management-alpine
     ports:
       - "5672:5672"
       - "15672:15672"
+    networks:
+      - observability
 
   frontend:
     build: .
@@ -74,3 +100,82 @@ services:
       - .env
     depends_on:
       - backend
+    networks:
+      - observability
+
+  # ── Observability Stack ──────────────────────────────────────────
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/config.yaml
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: tempo
+    command: -config.file=/etc/tempo/config.yaml
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/config.yaml
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "9411:9411"
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    ports:
+      - "3001:3000"   # 3000 is taken by your frontend
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+    networks:
+      - observability
