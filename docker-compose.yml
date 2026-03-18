@@ -1,7 +1,9 @@
-name: Xmarks
+name: SaveStack
 
 networks:
   observability:
+    driver: bridge
+  app:
     driver: bridge
 
 volumes:
@@ -11,47 +13,57 @@ volumes:
   prometheus_data:
 
 services:
+
   # ── App Services ─────────────────────────────────────────────────
 
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
-      - cache
-      - queue
-      - otel-collector
+      cache:
+        condition: service_started
+      queue:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     volumes:
-      - ./logs:/app/logs
-      - ./src:/app/src
+      - ./backend/logs:/app/logs
+      - ./backend/src:/app/src
     command: uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload
     networks:
       - observability
+      - app
 
   worker:
-    build: .
+    build:
+      context: ./backend
     command: celery -A src.celery.celery worker -l info
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
-      - cache
-      - queue
-      - otel-collector
+      cache:
+        condition: service_started
+      queue:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     volumes:
-      - ./logs:/app/logs
-      - ./src:/app/src
+      - ./backend/logs:/app/logs
+      - ./backend/src:/app/src
     networks:
       - observability
 
-  celery_beat:
-    build: .
+  celery-beat:
+    build:
+      context: ./backend
     command: celery -A src.celery.celery beat -l info
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
       - cache
       - queue
@@ -59,18 +71,44 @@ services:
       - observability
 
   flower:
-    build: .
+    build:
+      context: ./backend
     command: celery -A src.celery.celery flower --port=5555
-    ports:
-      - "5555:5555"
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
       - cache
       - queue
     networks:
       - observability
 
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    networks:
+      - app
+  
+  # ── Infrastructure ────────────────────────────────────────────────
+  nginx:
+      image: nginx:alpine
+      ports:
+        - "80:80"
+        - "443:443"
+      volumes:
+        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+        - ./nginx/conf.d:/etc/nginx/conf.d:ro
+        - /etc/letsencrypt:/etc/letsencrypt:ro
+      depends_on:
+        - frontend
+        - backend
+      networks:
+        - app
   cache:
     image: redis:7-alpine
     healthcheck:
@@ -78,8 +116,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    ports:
-      - "6800:6379"
     networks:
       - observability
 
@@ -91,29 +127,19 @@ services:
     networks:
       - observability
 
-  frontend:
-    build: .
-    command: uvicorn frontend:app --host 0.0.0.0 --port 3000
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    depends_on:
-      - backend
-    networks:
-      - observability
-
   # ── Observability Stack ──────────────────────────────────────────
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
     volumes:
-      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
+      - ./backend/observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "4317:4317"
       - "4318:4318"
       - "8888:8888"
+    healthcheck:
+      disable: true
     depends_on:
       - loki
       - tempo
@@ -126,7 +152,7 @@ services:
     container_name: loki
     command: -config.file=/etc/loki/config.yaml
     volumes:
-      - ./observability/loki.yaml:/etc/loki/config.yaml
+      - ./backend/observability/loki.yaml:/etc/loki/config.yaml
       - loki_data:/loki
     ports:
       - "3100:3100"
@@ -138,7 +164,7 @@ services:
     container_name: tempo
     command: -config.file=/etc/tempo/config.yaml
     volumes:
-      - ./observability/tempo.yaml:/etc/tempo/config.yaml
+      - ./backend/observability/tempo.yaml:/etc/tempo/config.yaml
       - tempo_data:/var/tempo
     ports:
       - "3200:3200"
@@ -154,7 +180,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --web.enable-remote-write-receiver
     volumes:
-      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./backend/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -170,9 +196,9 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./backend/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     ports:
-      - "3001:3000"   # 3000 is taken by your frontend
+      - "3001:3000"
     depends_on:
       - loki
       - tempo

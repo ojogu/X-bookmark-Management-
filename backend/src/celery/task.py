@@ -1,0 +1,254 @@
+import asyncio
+from contextlib import asynccontextmanager
+
+from celery import shared_task
+import concurrent
+from src.utils.log import get_logger
+from .celery import bg_task
+from src.v1.service.twitter import TwitterService 
+from src.v1.service.user import UserService 
+from src.v1.service.utils import get_valid_tokens
+from src.utils.db import get_async_db_session
+from src.v1.service.bookmark import BookmarkService
+from src.v1.service import data 
+from datetime import datetime
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_log, after_log
+
+# @asynccontextmanager
+# async def get_db_session():
+#     db = await get_db_session_no_context()
+#     try:
+#         yield db
+#     finally:
+#         await db.close()
+
+user_service_global = UserService(db=None) # Placeholder, will be initialized in task
+twitter_service = TwitterService()
+
+
+# Configure logging for Celery workers using structlog
+logger = get_logger(__name__)
+
+def run_async_in_sync(coro):
+    """
+    Helper function to run async code in sync Celery tasks
+    Creates a new event loop in a separate thread to avoid conflicts
+    """
+    def _run_in_thread():
+        # Create a fresh event loop in this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+    
+    # Run in a separate thread to avoid event loop conflicts
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_run_in_thread)
+        return future.result()
+
+
+    # --------------------------
+    # Front sync Task
+    # --------------------------
+    """    
+    Frontsync (or forward sync) fetches new/recent data from the source — data that has arrived since the last sync. It keeps the system current by pulling the leading edge of new records.
+    """
+    
+@shared_task(bind=True)
+def fetch_user_id_for_front_sync_task(self):
+    """
+    Celery beat cron job.
+    - Fetches all user IDs from DB
+    - Enqueues front_sync_bookmark_task for each user
+    """
+    async def _fetch_user_ids():
+        try:
+            async with get_async_db_session() as session:
+                user_service = UserService(session)
+                user_ids = await user_service.fetch_all_users_id()
+
+            logger.info(f"Fetched {len(user_ids)} user IDs.")
+
+            for user_id in user_ids:
+                logger.info(f"Enqueuing front_sync_bookmark_task for user_id={user_id}")
+                front_sync_bookmark_task.delay(user_id)
+
+            return {"fetched": len(user_ids)}
+
+        except Exception as e:
+            logger.error(f"Error in fetch_user_id_task: {e}", exc_info=True)
+            raise
+
+    return run_async_in_sync(_fetch_user_ids())
+
+
+@shared_task(bind=True)
+@retry(
+    retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10),
+    before=before_log(logger, logging.INFO),
+    after=after_log(logger, logging.INFO),
+    reraise=True
+)
+def front_sync_bookmark_task(self, user_id):
+    """
+    Celery task to read bookmarks from the API and write to the DB using time window.
+    Fetches bookmarks from last_sync_time to current time.
+    """
+    async def _front_sync_bookmarks():
+        try:
+            # Use your mentor's session factory
+            async with get_async_db_session() as session:
+                user_service = UserService(session)
+                bookmark_service = BookmarkService(user_service)
+                
+                tokens = await get_valid_tokens(user_id, session)
+                if not tokens:
+                    logger.warning(f"No valid tokens for user_id={user_id}. Skipping.")
+                    return {"user_id": user_id, "status": "no_tokens"}
+                
+                access_token = tokens.get("access_token")
+                x_id = tokens.get("x_id")
+                if not access_token or not x_id:
+                    logger.warning(f"Missing access_token/x_id for user_id={user_id}. Skipping.")
+                    return {"user_id": user_id, "status": "missing_credentials"}
+
+                # Get last sync time for time window
+                last_sync_time = await bookmark_service.get_last_sync_time(session, user_id)
+                current_time = datetime.now()
+                
+                logger.info(f"Front sync for user_id={user_id}, last_sync_time={last_sync_time}, current_time={current_time}")
+
+                # Fetch bookmarks using test data (time window logic would be implemented in real API)
+                bookmarks = data.test_data
+                # bookmarks = await twitter_service.get_bookmarks(
+                #     access_token=access_token,
+                #     x_id=x_id,
+                #     user_id=user_id,
+                #     start_time=last_sync_time,
+                #     max_results=100
+                # )
+                
+                # Handle case where no bookmarks are returned
+                if not bookmarks:
+                    logger.info(f"No bookmarks found for user_id={user_id}")
+                    return {"user_id": user_id, "bookmarks": 0, "status": "no_bookmarks"}
+                
+                # Handle case where bookmarks is None
+                if bookmarks is None:
+                    logger.warning(f"Bookmark fetch returned None for user_id={user_id}")
+                    return {"user_id": user_id, "bookmarks": 0, "status": "fetch_failed"}
+                
+                logger.info(f"Fetched {len(bookmarks)} bookmarks for user_id={user_id}")
+
+                # Save bookmarks and update sync time
+                await bookmark_service.save_bookmarks(
+                    session, 
+                    user_id, 
+                    bookmarks, 
+                    sync_time=current_time
+                )
+                
+                return {"user_id": user_id, "bookmarks": len(bookmarks), "status": "success"}
+
+        except Exception as e:
+            logger.error(f"Error in front_sync_bookmark_task for user_id={user_id}: {e}", exc_info=True)
+            raise
+
+    return run_async_in_sync(_front_sync_bookmarks())
+
+
+
+    # --------------------------
+    # BackFill Task
+    # --------------------------
+
+@shared_task(bind=True)
+def fetch_user_id_for_backfill_task(self):
+    """
+    Celery beat job for scheduling backfill tasks.
+    Runs less frequently than front sync (e.g., every 15 mins / hourly).
+    Backfill fetches historical data — records that predate the initial sync or that were missed. It fills in the past, working backward (or forward through older time ranges) to achieve completeness.
+
+    """
+    async def _fetch_user_ids():
+        async with get_async_db_session() as session:
+            user_service = UserService(session)
+            user_ids = await user_service.fetch_all_users_id()
+
+        for user_id in user_ids:
+            backfill_bookmark_task.delay(user_id)
+
+        return {"queued": len(user_ids)}
+
+    return run_async_in_sync(_fetch_user_ids())
+
+
+@shared_task(bind=True)
+@retry(
+    retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10),
+    before=before_log(logger, logging.INFO),
+    after=after_log(logger, logging.INFO),
+    reraise=True
+)
+def backfill_bookmark_task(self, user_id):
+    """
+    Celery task to fetch older bookmarks using pagination token.
+    Works with a single user_id and uses stored next_token for pagination.
+    """
+    async def _fetch_back_fill_bookmarks():
+        try:
+            # Use your mentor's session factory
+            async with get_async_db_session() as session:
+                user_service = UserService(session)
+                bookmark_service = BookmarkService(user_service)
+                
+                tokens = await get_valid_tokens(user_id, session)
+                if not tokens:
+                    logger.warning(f"No valid tokens for user_id={user_id}. Skipping.")
+                    return {"user_id": user_id, "status": "no_tokens"}
+                
+                access_token = tokens.get("access_token")
+                x_id = tokens.get("x_id")
+                if not access_token or not x_id:
+                    logger.warning(f"Missing access_token/x_id for user_id={user_id}. Skipping.")
+                    return {"user_id": user_id, "status": "missing_credentials"}
+                
+                # Get the stored next_token for pagination
+                next_token = await bookmark_service.fetch_next_token(session, user_id)
+                logger.info(f"Backfill for user_id={user_id}, next_token={next_token}")
+
+                # Fetch bookmarks using test data with pagination token
+                bookmarks = data.test_data
+                # bookmarks = await twitter_service.get_bookmarks(
+                #     access_token=access_token,
+                #     x_id=x_id,
+                #     user_id=user_id,
+                #     max_results=100,
+                #     pagination_token=next_token
+                # )
+                
+                logger.info(f"Fetched {len(bookmarks)} bookmarks for user_id={user_id}")
+
+                # Save bookmarks with the next_token for future pagination
+                await bookmark_service.save_bookmarks(
+                    session, 
+                    user_id, 
+                    bookmarks, 
+                    next_token=next_token
+                )
+                
+                return {"user_id": user_id, "bookmarks": len(bookmarks), "status": "success"}
+
+        except Exception as e:
+            logger.error(f"Error in backfill_bookmark_task for user_id={user_id}: {e}", exc_info=True)
+            raise
+
+    return run_async_in_sync(_fetch_back_fill_bookmarks())
+    
