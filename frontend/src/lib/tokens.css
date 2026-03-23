@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+
+  --bg: #FAFAF8;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F2EE;
+
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B67;
+  --text-muted: #A0A09C;
+
+  --accent: #1A6B4A;
+  --accent-mid: #1D9E75;
+  --accent-light: #E1F5EE;
+  --accent-hover: #155c3e;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 100px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111110;
+    --bg-card: #1C1C1A;
+    --bg-subtle: #242422;
+
+    --text-primary: #F0EFE8;
+    --text-secondary: #A0A09C;
+    --text-muted: #6B6B67;
+
+    --accent: #1D9E75;
+    --accent-mid: #5DCAA5;
+    --accent-light: #04342C;
+    --accent-hover: #25b585;
+
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.13);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
