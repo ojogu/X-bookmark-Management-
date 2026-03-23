@@ -1,4 +1,4 @@
-name: SaveStack
+name: SaveStack-dev
 
 networks:
   observability:
@@ -34,7 +34,7 @@ services:
     volumes:
       - ./backend/logs:/app/logs
       - ./backend/src:/app/src
-    command: uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload 
+    command: uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload
     networks:
       - observability
       - app
@@ -79,40 +79,31 @@ services:
     depends_on:
       - cache
       - queue
-    ports:
-      - "5555:5555"
     networks:
       - observability
 
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     target: dev
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "5173:5173"
+  #   networks:
+  #     - app
   frontend:
-    build:
-      context: ./frontend
-      target: prod
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-    # ports:
-    #   - "5173:5173"
-    networks:
-      - app
-  
-  # ── Infrastructure ────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
+    build: ./backend
+    command: uvicorn frontend:app --host 0.0.0.0 --port 3000
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
     depends_on:
-      - frontend
       - backend
-    networks:
-      - app
+  # ── Infrastructure ────────────────────────────────────────────────
+
   cache:
     image: redis:7-alpine
     healthcheck:
@@ -152,7 +143,7 @@ services:
       - observability
 
   loki:
-    image: grafana/loki:3.0.0
+    image: grafana/loki:2.9.4
     container_name: loki
     command: -config.file=/etc/loki/config.yaml
     volumes:
@@ -202,7 +193,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./backend/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - loki
       - tempo

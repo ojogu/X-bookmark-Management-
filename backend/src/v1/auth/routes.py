@@ -47,6 +47,7 @@ async def handle_callback(
 ):
     # Check if this is a test request
     if test:
+        logger.info(f"webhook is ready")
         return {"status": "ready"}
     
     try:

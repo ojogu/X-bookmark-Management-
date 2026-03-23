@@ -1,3 +1,4 @@
+import logging
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -6,12 +7,13 @@ from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry._logs import set_logger_provider
-from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
 # The gRPC endpoint of your OpenTelemetry Collector.
 # In Docker Compose, "otel-collector" resolves to the collector container.
@@ -19,7 +21,7 @@ from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExp
 OTEL_ENDPOINT = "http://otel-collector:4317"
 
 
-def setup_telemetry(app=None, service_name: str = "save stack-api"):
+def setup_telemetry(app=None, service_name: str = "save-stack-api"):
     """
     Bootstraps the three OTel signals (traces, metrics, logs) for a FastAPI app
     and registers them with the global OTel SDK providers.
@@ -86,6 +88,16 @@ def setup_telemetry(app=None, service_name: str = "save stack-api"):
     # Register globally so the OTel logging bridge handler picks it up.
     set_logger_provider(logger_provider)
 
+    # Bridge Python's standard logging module into the OTel pipeline.
+    # Without this, logger.info(...) calls go to stdout only — the LoggerProvider
+    # exists but nothing feeds into it. LoggingInstrumentor patches the logging
+    # module so every log record is also forwarded to the OTel SDK.
+    # LoggingHandler then attaches the provider to the root logger explicitly.
+    LoggingInstrumentor().instrument(set_logging_format=True)
+    handler = LoggingHandler(logger_provider=logger_provider)
+    logging.getLogger().addHandler(handler)
+    logging.getLogger().setLevel(logging.DEBUG)
+
     # ── AUTO-INSTRUMENTATION ──────────────────────────────────────────────────
     # These patch FastAPI and httpx at runtime — no manual span creation needed.
 
@@ -98,13 +110,12 @@ def setup_telemetry(app=None, service_name: str = "save stack-api"):
     # Critical for tracing calls to the X (Twitter) API and any other external services,
     # so they appear as child spans inside the parent request trace.
     HTTPXClientInstrumentor().instrument()
-    
-    
-    
-# This is your OpenTelemetry (OTel) bootstrap for the Xmarks API. It sets up the three pillars of observability — traces, metrics, and logs — and ships them all to a central OTel Collector over gRPC (port 4317). It also auto-instruments FastAPI and httpx so you get spans without manual instrumentation.
+
+
+# This is your OpenTelemetry (OTel) bootstrap for the Savestack API. It sets up the three pillars of observability — traces, metrics, and logs — and ships them all to a central OTel Collector over gRPC (port 4317). It also auto-instruments FastAPI and httpx so you get spans without manual instrumentation.
 # Flow:
 
-# Creates a Resource that tags all telemetry with the service name (xmarks-api)
+# Creates a Resource that tags all telemetry with the service name (Savestack-api)
 # Wires up a TracerProvider → batches spans → exports to collector
 # Wires up a MeterProvider → periodically reads metrics → exports to collector
 # Wires up a LoggerProvider → batches log records → exports to collector

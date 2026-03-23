@@ -20,6 +20,7 @@ class Config(BaseSettings):
     encryption_key:str
     celery_broker_url:str
     celery_result_backend:str
+    app_env:str
 
     model_config = SettingsConfigDict(
         case_sensitive=False,

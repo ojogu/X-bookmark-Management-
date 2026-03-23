@@ -6,6 +6,9 @@ import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
+from .config import config
+from opentelemetry.sdk._logs import LoggingHandler
+from opentelemetry._logs import get_logger_provider
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -36,7 +39,7 @@ def configure_structlog() -> None:
     The key pattern: structlog renders nothing itself. It hands off to
     ProcessorFormatter which runs the final renderer per-handler.
     """
-    is_dev = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "local")
+    is_dev = config.app_env
 
     # structlog is configured to stop just before rendering.
     # ProcessorFormatter (attached to each handler) does the final render.
@@ -75,20 +78,24 @@ def configure_structlog() -> None:
     file_handler = logging.FileHandler(os.path.join(LOGS_DIR, "app.log"))
     file_handler.setFormatter(file_formatter)
 
-    # --- Root logger: wire both handlers ---
+    # --- OTel handler ---
+    # Re-added explicitly after handlers.clear() to ensure the OTel LoggingHandler
+    # is not wiped. setup_telemetry() runs at module level before this function,
+    # so get_logger_provider() returns the already-registered OTel LoggerProvider.
+    otel_handler = LoggingHandler(logger_provider=get_logger_provider())
+
+    # --- Root logger: wire all three handlers ---
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # Remove any handlers added before this call
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+    root_logger.addHandler(otel_handler)
     root_logger.setLevel(logging.DEBUG if is_dev else logging.INFO)
 
     # Quiet noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-
-# Run once at import time
-configure_structlog()
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +105,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
     """Binds request-scoped context to structlog for the lifetime of each request."""
 
     async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
 
         bind_contextvars(
             request_id=request_id,

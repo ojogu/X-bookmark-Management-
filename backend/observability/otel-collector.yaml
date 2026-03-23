@@ -54,4 +54,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [otlphttp/loki]
+      exporters: [otlphttp/loki, debug]

@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 import uvicorn
 from contextlib import asynccontextmanager
-# from utils.db import init_db
 from src.utils.db import init_db, drop_db
 from src.utils.redis import setup_redis
-from src.v1.auth.routes import auth_router
-from fastapi.middleware.cors import CORSMiddleware
 from src.utils.config import Settings, config
 from src.utils.exception import register_error_handlers
+from src.utils.telemetry import setup_telemetry
+from src.utils.log import RequestContextMiddleware, configure_structlog
+from fastapi.middleware.cors import CORSMiddleware
+from src.v1.auth.routes import auth_router
 from src.v1.route.twitter import twitter_router
-from src.utils.log import RequestContextMiddleware
 @asynccontextmanager
 async def life_span(app: FastAPI):
     """
@@ -25,6 +25,10 @@ async def life_span(app: FastAPI):
     Yields:
         None: This function yields control back to the application after startup.
     """
+    
+    # Run once at import time, to overide uvicorn setup
+    configure_structlog()
+    
     
     # print(f"dropping db....")
     # await drop_db()
@@ -42,6 +46,7 @@ async def life_span(app: FastAPI):
     
     # Shutdown: Perform any necessary cleanup
     print(f"server is ending.....")
+    
 
 app = FastAPI(
     lifespan=life_span
@@ -61,12 +66,15 @@ app.add_middleware(RequestContextMiddleware)
 #register error handlers 
 register_error_handlers(app)
 
+#setup telemetry
+setup_telemetry(app)
+
 #register routers/blueprint
 app.include_router(auth_router, prefix=Settings.API_V1_PREFIX)
 app.include_router(twitter_router, prefix=Settings.API_V1_PREFIX)
 
 
-@app.get("/")
+@app.get(f"{Settings.API_V1_PREFIX}/root")
 def root():
     """
     Root endpoint for the FastAPI application.

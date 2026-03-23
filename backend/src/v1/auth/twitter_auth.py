@@ -89,6 +89,7 @@ class TwitterAuthService(TokenRefreshService):
             # Use XDK to exchange the authorization code for tokens
             # XDK will handle the OAuth2 token exchange automatically by parsing the URL
             token_data = self.client.fetch_token(authorization_response_url)
+            logger.info(f"access_token: {token_data["access_token"]}")
 
             logger.info("Successfully exchanged code for tokens")
 
