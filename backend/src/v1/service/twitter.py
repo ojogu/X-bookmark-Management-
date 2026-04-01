@@ -2,6 +2,7 @@ from src.v1.service.bookmark import BookmarkService
 from src.utils.xdk_client import xdk_client
 from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
+from src.v1.schemas.user import UserInfoFromX
 
 logger = get_logger(__name__)
 
@@ -15,14 +16,15 @@ class TwitterService:
         self.client = xdk_client
 
     def _user_to_dict(self, user) -> Dict[str, Any]:
-        """Convert XDK User object to dict format for backward compatibility"""
+        """Convert XDK User object to dict format and validate against UserInfoFromX schema"""
         if hasattr(user, 'model_dump'):
             user_data = user.model_dump()
         else:
             # Handle case where user might be a dict already
             user_data = user if isinstance(user, dict) else {}
 
-        return {
+        # Extract data following the same pattern as the original code
+        user_dict = {
             "id": user_data.get('id'),
             "username": user_data.get('username'),
             "name": user_data.get('name'),
@@ -36,6 +38,15 @@ class TwitterService:
             "url": user_data.get('url'),
             "created_at": user_data.get('created_at')
         }
+
+        # Validate against UserInfoFromX schema
+        try:
+            validated_user = UserInfoFromX(**user_dict)
+            return validated_user.model_dump()
+        except Exception as e:
+            logger.warning(f"User data validation failed: {e}")
+            # Return original dict if validation fails, maintaining backward compatibility
+            return user_dict
 
     # USER METHODS
 

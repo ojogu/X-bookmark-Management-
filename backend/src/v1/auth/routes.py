@@ -86,9 +86,9 @@ async def handle_callback(
 
         # Redirect to frontend with JWT
         return RedirectResponse(
-        url = f"{config.frontend_url}/dashboard?{urlencode(params)}",
-        status_code=302
-        )
+            url=f"{config.frontend_url}/callback?{urlencode(params)}",
+            status_code=302
+        ) #set cookie on /auth/callback redirect
 
     except Exception as e:
         logger.error(f"Callback processing failed: {str(e)}", exc_info=True)

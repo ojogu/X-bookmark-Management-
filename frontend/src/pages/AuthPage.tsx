@@ -1,15 +1,31 @@
-import { useState } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { useState, useEffect } from 'react'
 
 type AuthState = 'idle' | 'loading' | 'error'
 
 export default function AuthPage() {
   const [authState, setAuthState] = useState<AuthState>('idle')
+  const { loginWithX } = useAuth()
 
-  function handleConnect() {
-    setAuthState('loading')
-    // TODO: trigger X OAuth redirect
-    // window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/x/login`
+  // Check if backend redirected here with an error
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error')) {
+      setAuthState('error')
+      // Clean the error from the URL
+      window.history.replaceState({}, '', '/auth')
+    }
+  }, [])
+
+  async function handleConnect() {
+    try {
+      setAuthState('loading')
+      await loginWithX()
+    } catch {
+      setAuthState('error')
+    }
   }
+
 
   return (
     <div style={{
@@ -19,7 +35,6 @@ export default function AuthPage() {
       padding: '1.5rem',
     }}>
 
-      {/* Header */}
       <header style={{
         position: 'fixed', top: 0, width: '100%',
         height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -33,7 +48,6 @@ export default function AuthPage() {
         }}>SaveStack</span>
       </header>
 
-      {/* Auth Card */}
       <main style={{
         width: '100%', maxWidth: 400,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -45,7 +59,6 @@ export default function AuthPage() {
           display: 'flex', flexDirection: 'column', alignItems: 'center',
         }}>
 
-          {/* Branding */}
           <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
             <h1 style={{
               fontFamily: 'var(--font-serif)', fontSize: '2rem',
@@ -54,14 +67,11 @@ export default function AuthPage() {
             }}>
               Connect your X account
             </h1>
-            <p style={{
-              fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7,
-            }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
               SaveStack reads your bookmarks. It never posts, follows, or modifies anything on your behalf.
             </p>
           </div>
 
-          {/* Connect Button */}
           <button
             onClick={handleConnect}
             disabled={authState === 'loading'}
@@ -76,19 +86,12 @@ export default function AuthPage() {
             }}
           >
             {authState === 'loading' ? (
-              <>
-                <Spinner />
-                Connecting...
-              </>
+              <><Spinner /> Connecting...</>
             ) : (
-              <>
-                <XLogo />
-                Continue with X
-              </>
+              <><XLogo /> Continue with X</>
             )}
           </button>
 
-          {/* Error State */}
           {authState === 'error' && (
             <div style={{
               marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 6,
@@ -99,7 +102,6 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* Fine print */}
           <div style={{ marginTop: '2rem', textAlign: 'center' }}>
             <p style={{
               fontSize: 11, color: 'var(--text-muted)',
@@ -114,7 +116,6 @@ export default function AuthPage() {
 
         </div>
 
-        {/* Visual anchor */}
         <div style={{
           marginTop: '3rem', display: 'flex', flexDirection: 'column',
           alignItems: 'center', gap: '1rem', opacity: 0.4,
@@ -127,12 +128,10 @@ export default function AuthPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer style={{
         position: 'fixed', bottom: 0, width: '100%',
         paddingBottom: '2rem',
-        display: 'flex', justifyContent: 'center', gap: '1.5rem',
-        flexWrap: 'wrap',
+        display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap',
       }}>
         {['© 2024 SaveStack', 'Terms of Service', 'Privacy Policy', 'Help Center'].map(item => (
           <span key={item} style={{

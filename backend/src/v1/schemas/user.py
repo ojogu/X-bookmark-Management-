@@ -38,3 +38,21 @@ class User_Token(BaseModel):
     access_token: str
     scope: str
     refresh_token: str
+
+
+class UserInfoFromX(BaseModel):
+    """Pydantic model for Twitter user information from X API"""
+    id: str
+    username: str
+    name: str
+    profile_image_url: str | None = None
+    description: str | None = None
+    followers_count: int = 0
+    following_count: int = 0
+    tweet_count: int = 0
+    verified: bool = False
+    location: str | None = None
+    url: str | None = None
+    created_at: str | None = None
+    
+
