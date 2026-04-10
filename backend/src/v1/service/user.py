@@ -2,9 +2,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
-from datetime import datetime, timedelta, timezone 
+from datetime import datetime, timedelta, timezone
 from .interfaces import TokenRefreshService
 from src.v1.auth.service import encrypt_token, decrypt_token
+
 # from src.v1.auth.service import au
 from src.v1.base.exception import (
     Environment_Variable_Exception,
@@ -17,14 +18,13 @@ from src.v1.base.exception import (
     NotVerified,
     EmailVerificationError,
     ServerError,
-    NotActive, 
-    BaseExceptionClass
-    
+    NotActive,
+    BaseExceptionClass,
 )
 
 from src.utils.log import get_logger
-logger = get_logger(__name__)
 
+logger = get_logger(__name__)
 
 
 def parse_token_data(token_dict: dict) -> dict:
@@ -50,7 +50,9 @@ def parse_token_data(token_dict: dict) -> dict:
         try:
             expires_in_seconds = int(updated_dict["expires_in"])
         except (ValueError, TypeError) as e:
-            raise ValueError(f"Cannot convert 'expires_in' to integer: {updated_dict['expires_in']}") from e
+            raise ValueError(
+                f"Cannot convert 'expires_in' to integer: {updated_dict['expires_in']}"
+            ) from e
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
         del updated_dict["expires_in"]
     else:
@@ -67,37 +69,38 @@ def parse_token_data(token_dict: dict) -> dict:
     return updated_dict
 
 
-class UserService():
-    def __init__(self, db:AsyncSession):
+class UserService:
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def create_user(self, user_data: dict):
         x_id = user_data["x_id"]
         logger.info(f"Attempting to create user with x_id: {x_id}")
-        
+
         user = await self.check_if_user_exist_X_id(x_id)
         if user:
-            logger.warning(f" {x_id} already exists. Return our jwt to authenticate user for our app")
+            logger.warning(
+                f" {x_id} already exists. Return our jwt to authenticate user for our app"
+            )
             return user
-        
-            
+
         new_user = User(**user_data)
         self.db.add(new_user)
         logger.debug(f"Adding new user to database session: {user_data}")
-        
+
         try:
             await self.db.flush()  # Use flush to get potential errors before commit
-            await self.db.refresh(new_user) # Refresh to get DB defaults like ID, created_at
-            # await self.db.commit() 
+            await self.db.refresh(
+                new_user
+            )  # Refresh to get DB defaults like ID, created_at
+            # await self.db.commit()
             logger.info(f"Successfully created new user with x_id: {x_id}")
             return new_user
-        
 
         except SQLAlchemyError as e:
             await self.db.rollback()
             logger.error(f"SQLAlchemy error while creating user {x_id}: {str(e)}")
-            raise ServerError() 
-
+            raise ServerError()
 
     async def store_user_token(self, user_id: str, user_token: dict):
         logger.info(f"user tokens: {user_token}")
@@ -133,20 +136,16 @@ class UserService():
             logger.error(f"Database error while storing token for user {user_id}: {e}")
             raise ServerError(f"Could not store token: {e}") from e
 
-    
-    
     async def check_if_user_exist_X_id(self, x_id: str):
         result = await self.db.execute(sa.select(User).where(x_id == User.x_id))
         if not result:
             return None
-        return result.scalar_one_or_none() 
+        return result.scalar_one_or_none()
 
-    
-    async def check_if_user_exists_user_id(self, user_id:str):
+    async def check_if_user_exists_user_id(self, user_id: str):
         result = await self.db.execute(sa.select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
-    
-    
+
     async def fetch_user_token(self, user_id):
         result = await self.db.execute(
             sa.select(UserToken).where(UserToken.user_id == user_id)
@@ -166,21 +165,16 @@ class UserService():
                 "scope": user_token.scope,
                 "refresh_token": decrypted_refresh_token,
                 "expires_at": user_token.expires_at,
-                "is_expired": user_token.is_expired
+                "is_expired": user_token.is_expired,
             }
         return None
-    
 
-    
     async def is_token_expired(self, user_id):
         logger.info(f"Checking if token is expired for user_id: {user_id}")
         try:
             result = await self.db.execute(
                 sa.select(UserToken).where(
-                    sa.and_(
-                        UserToken.user_id == user_id,
-                        UserToken.is_expired 
-                    )
+                    sa.and_(UserToken.user_id == user_id, UserToken.is_expired)
                 )
             )
             token_is_expired = result.scalar_one_or_none() is not None
@@ -190,18 +184,16 @@ class UserService():
                 logger.info(f"Token for user_id: {user_id} has not expired.")
             return token_is_expired
         except SQLAlchemyError as e:
-            logger.error(f"Database error while checking token expiration for user {user_id}: {e}", exc_info=True)
+            logger.error(
+                f"Database error while checking token expiration for user {user_id}: {e}",
+                exc_info=True,
+            )
             raise ServerError(f"Could not check token expiration: {e}") from e
 
-
     async def fetch_all_users_id(self):
-        stmt = await self.db.execute(
-            sa.select(
-                User.id
-            )
-        )
-        return stmt.scalars().all() #scalars return multiple rows, but only the first column/object from each row.
-    
+        stmt = await self.db.execute(sa.select(User.id))
+        return stmt.scalars().all()  # scalars return multiple rows, but only the first column/object from each row.
+
     # async def fetch_X_id_for_a_user(self, user_id:str):
     #     # user_id = await self.check_if_user_exists_user_id(user_id)
     #     stmt = (
@@ -211,25 +203,27 @@ class UserService():
     #     )
     #     result = await self.db.execute(stmt)
     #     return result.scalar_one_or_none()
-    
+
     async def fetch_X_id_for_a_user(self, user_id: str):
         user = await self.check_if_user_exists_user_id(user_id)
         return user.x_id
 
-    async def get_valid_tokens(self, user_id: str, refresh_service: TokenRefreshService) -> dict:
+    async def get_valid_tokens(
+        self, user_id: str, refresh_service: TokenRefreshService
+    ) -> dict:
         """
         Get valid tokens for a user, refreshing if expired.
-        
+
         This method uses dependency injection to avoid circular dependencies
         between UserService and TwitterAuthService.
-        
+
         Args:
             user_id: The user ID to fetch tokens for
             refresh_service: TokenRefreshService implementation for refreshing tokens
-            
+
         Returns:
             Dictionary containing access_token, user_id, and x_id
-            
+
         Raises:
             ValueError: If no tokens found for user
             Exception: For other errors during token processing
@@ -237,35 +231,99 @@ class UserService():
         logger.info(f"Attempting to get valid tokens for user: {user_id}")
         try:
             x_id = await self.fetch_X_id_for_a_user(user_id)
-            
+
             tokens = await self.fetch_user_token(user_id=user_id)
             if not tokens:
                 logger.warning(f"No tokens found for user: {user_id}")
                 raise ValueError(f"No tokens found for user: {user_id}")
-            
+
             current_time = datetime.now(timezone.utc)
-            is_expired = current_time > tokens["expires_at"] if tokens["expires_at"] else True
-            
+            is_expired = (
+                current_time > tokens["expires_at"] if tokens["expires_at"] else True
+            )
+
             # Check expiration directly on the fetched token
             if is_expired:
                 logger.info(f"Token expired for user: {user_id}, fetching new tokens")
-                new_tokens = await refresh_service.refresh_token(tokens["refresh_token"])
+                new_tokens = await refresh_service.refresh_token(
+                    tokens["refresh_token"]
+                )
                 logger.info(f"New token fetched for user: {user_id}")
-                user_tokens = await self.store_user_token(user_id=user_id, user_token=new_tokens)
+                user_tokens = await self.store_user_token(
+                    user_id=user_id, user_token=new_tokens
+                )
                 logger.info(f"New token stored for user: {user_id}")
             else:
                 logger.info(f"Token for user: {user_id} is still valid")
                 user_tokens = tokens
 
             return {
-                "access_token": user_tokens["access_token"] if isinstance(user_tokens, dict) else user_tokens.access_token,
-                "user_id": user_tokens["user_id"] if isinstance(user_tokens, dict) else user_tokens.user_id,
-                "x_id": x_id
+                "access_token": user_tokens["access_token"]
+                if isinstance(user_tokens, dict)
+                else user_tokens.access_token,
+                "user_id": user_tokens["user_id"]
+                if isinstance(user_tokens, dict)
+                else user_tokens.user_id,
+                "x_id": x_id,
             }
-            
+
         except Exception as e:
-            logger.error(f"An error occurred while getting valid tokens for user {user_id}: {e}", exc_info=True)
+            logger.error(
+                f"An error occurred while getting valid tokens for user {user_id}: {e}",
+                exc_info=True,
+            )
             raise
-    
-    
-    
+
+    async def get_user_info(self, user_id: str) -> dict:
+        """Fetch user info from database."""
+        user = await self.check_if_user_exists_user_id(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+
+        return {
+            "id": user.x_id,
+            "username": user.username,
+            "name": user.name,
+            "profile_image_url": user.profile_image_url,
+            "description": user.description,
+            "verified": user.verified,
+            "location": user.location,
+            "url": user.url,
+            "followers_count": user.followers_count,
+            "following_count": user.following_count,
+            "tweet_count": user.tweet_count,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_user_info_update": user.last_user_info_update,
+        }
+
+    async def update_user_info(self, user_id: str, user_data: dict) -> User:
+        """Update user info in database."""
+        user = await self.check_if_user_exists_user_id(user_id)
+        if not user:
+            raise NotFoundError("User not found")
+
+        update_fields = [
+            "description",
+            "verified",
+            "location",
+            "url",
+            "tweet_count",
+            "followers_count",
+            "following_count",
+        ]
+
+        for field in update_fields:
+            if field in user_data:
+                setattr(user, field, user_data[field])
+
+        user.last_user_info_update = datetime.now(timezone.utc)
+
+        try:
+            await self.db.flush()
+            await self.db.refresh(user)
+            logger.info(f"Updated user info for user_id: {user_id}")
+            return user
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error while updating user info for {user_id}: {e}")
+            raise ServerError(f"Could not update user info: {e}") from e
