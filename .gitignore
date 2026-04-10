@@ -180,3 +180,4 @@ coverage/
 .dynamodb/
 .tern-port
 .vscode-test/
+.opencode

@@ -24,6 +24,12 @@ services:
       - "127.0.0.1:5000:5000"
     env_file:
       - ./backend/.env
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
     depends_on:
       cache:
         condition: service_started
@@ -45,6 +51,12 @@ services:
     command: celery -A src.celery.celery worker -l info
     env_file:
       - ./backend/.env
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
     depends_on:
       cache:
         condition: service_started
@@ -64,6 +76,12 @@ services:
     command: celery -A src.celery.celery beat -l info
     env_file:
       - ./backend/.env
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
     depends_on:
       - cache
       - queue
@@ -76,6 +94,12 @@ services:
     command: celery -A src.celery.celery flower --port=5555
     env_file:
       - ./backend/.env
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
     depends_on:
       - cache
       - queue
@@ -97,6 +121,12 @@ services:
       - backend
     networks:
       - app
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+        reservations:
+          memory: 64m
   
   # ── Infrastructure ────────────────────────────────────────────────
   nginx:
@@ -112,6 +142,12 @@ services:
       - backend
     networks:
       - app
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+        reservations:
+          memory: 64m
   cache:
     image: redis:7-alpine
     healthcheck:
@@ -121,6 +157,12 @@ services:
       retries: 5
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
 
   queue:
     image: rabbitmq:3.13-management-alpine
@@ -129,6 +171,12 @@ services:
       - "15672:15672"
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
 
   # ── Observability Stack ──────────────────────────────────────────
 
@@ -149,6 +197,12 @@ services:
       - prometheus
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
 
   loki:
     image: grafana/loki:3.0.0
@@ -161,6 +215,12 @@ services:
       - "3100:3100"
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
 
   tempo:
     image: grafana/tempo:2.4.1
@@ -174,6 +234,12 @@ services:
       - "9411:9411"
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
 
   prometheus:
     image: prom/prometheus:v2.51.0
@@ -189,6 +255,12 @@ services:
       - "9090:9090"
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -208,3 +280,9 @@ services:
       - prometheus
     networks:
       - observability
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
