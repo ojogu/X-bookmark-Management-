@@ -446,3 +446,4 @@
 {"event": "OAuth2 authorization URL generation completed successfully", "path": "/api/v1/auth/login", "request_id": "eb4655a6", "method": "GET", "level": "info", "logger": "src.v1.auth.twitter_auth", "timestamp": "2026-03-26T11:49:57.039760Z"}
 {"event": "Initializing Redis connection to redis://cache:6379/0", "level": "info", "logger": "src.utils.redis", "timestamp": "2026-03-26T22:52:08.804106Z"}
 {"event": "Initializing Redis connection to redis://cache:6379/0", "level": "info", "logger": "src.utils.redis", "timestamp": "2026-03-26T23:47:36.263190Z"}
+{"event": "webhook is ready", "path": "/api/v1/auth/callback", "request_id": "5147ebee", "method": "GET", "level": "info", "logger": "src.v1.auth.routes", "timestamp": "2026-04-06T21:08:01.792725Z"}
