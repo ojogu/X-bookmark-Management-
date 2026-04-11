@@ -129,25 +129,6 @@ services:
           memory: 64m
   
   # ── Infrastructure ────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "8080:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - app
-    deploy:
-      resources:
-        limits:
-          memory: 128m
-        reservations:
-          memory: 64m
   cache:
     image: redis:7-alpine
     healthcheck:
