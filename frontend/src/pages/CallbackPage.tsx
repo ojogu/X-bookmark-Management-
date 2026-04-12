@@ -17,6 +17,13 @@ export default function CallbackPage() {
   const [messageIndex, setMessageIndex] = useState(0)
 
   useEffect(() => {
+    if (authStore.isAuthenticated()) {
+      navigate('/dashboard', { replace: true })
+      return
+    }
+  }, [navigate])
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setMessageIndex(i => (i + 1) % messages.length)
     }, 1800)
@@ -95,13 +102,13 @@ export default function CallbackPage() {
             Something went wrong. Please try again.
           </p>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate('/')}
             style={{
               fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
               color: '#fff', background: 'var(--accent)', border: 'none',
               borderRadius: 'var(--radius-md)', padding: '0.6rem 1.5rem', cursor: 'pointer',
             }}>
-            Back to login
+            Back to Home
           </button>
         </div>
       )}

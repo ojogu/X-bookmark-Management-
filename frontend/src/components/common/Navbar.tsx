@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function Navbar() {
   const navigate = useNavigate()
+  const { loginWithX } = useAuth()
 
   return (
     <nav style={{
@@ -35,7 +37,7 @@ export default function Navbar() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={loginWithX}
             style={{
               fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
               color: 'var(--text-primary)', background: 'transparent',
@@ -43,7 +45,7 @@ export default function Navbar() {
               padding: '0.55rem 1.25rem', cursor: 'pointer',
             }}>Sign in</button>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={loginWithX}
             style={{
               fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
               color: '#fff', background: 'var(--accent)', border: 'none',

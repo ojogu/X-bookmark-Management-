@@ -43,7 +43,7 @@ client.interceptors.response.use(
     const refreshToken = authStore.getRefreshToken()
     if (!refreshToken) {
       authStore.clearTokens()
-      window.location.href = '/auth'
+      window.location.href = '/'
       return Promise.reject(error)
     }
 
@@ -73,7 +73,7 @@ client.interceptors.response.use(
     } catch (err) {
       processQueue(err, null)
       authStore.clearTokens()
-      window.location.href = '/auth'
+      window.location.href = '/'
       return Promise.reject(err)
     } finally {
       isRefreshing = false

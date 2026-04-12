@@ -19,7 +19,7 @@ export function useAuth() {
 
   function logout() {
     authStore.clearTokens()
-    navigate('/auth')
+    navigate('/')
   }
 
   function isAuthenticated() {

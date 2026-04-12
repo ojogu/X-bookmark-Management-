@@ -1,7 +1,7 @@
-import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function HeroSection() {
-  const navigate = useNavigate()
+  const { loginWithX } = useAuth()
 
   return (
     <section style={{ padding: '6rem 1.5rem 8rem', position: 'relative', overflow: 'hidden' }}>
@@ -37,7 +37,7 @@ export default function HeroSection() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={loginWithX}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 500,
@@ -48,7 +48,7 @@ export default function HeroSection() {
             Connect with X
           </button>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={loginWithX}
             style={{
               fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 500,
               color: 'var(--text-secondary)', background: 'transparent',
