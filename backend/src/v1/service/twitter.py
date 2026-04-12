@@ -3,6 +3,17 @@ from src.utils.xdk_client import xdk_client
 from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
 from src.v1.schemas.user import UserInfoFromX
+import logging
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    wait_random,
+    retry_if_exception_type,
+    before_sleep_log,
+    after_log,
+)
+import httpx
 
 logger = get_logger(__name__)
 
@@ -55,6 +66,16 @@ class TwitterService:
 
     # USER METHODS
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """Get authenticated user's information - returns clean user object"""
         try:
@@ -90,6 +111,16 @@ class TwitterService:
             logger.error(f"Failed to get user info: {e}", exc_info=True)
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def get_user_by_username(
         self, access_token: str, username: str
     ) -> Dict[str, Any]:
@@ -123,6 +154,16 @@ class TwitterService:
             )
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def get_user_by_id(self, access_token: str, user_id: str) -> Dict[str, Any]:
         """Get user by ID - returns clean user object"""
         try:
@@ -153,6 +194,22 @@ class TwitterService:
             raise
 
     # BOOKMARK METHODS
+
+    class APIError(Exception):
+        """Raised when API returns error status (429/5xx)"""
+
+        pass
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def get_bookmarks(
         self,
         access_token: str,
@@ -209,14 +266,21 @@ class TwitterService:
                 first_page = page
                 break
 
+            # Check for API errors in response
+            response_data = (
+                first_page.model_dump()
+                if hasattr(first_page, "model_dump")
+                else first_page
+            )
+            if isinstance(response_data, dict):
+                if response_data.get("errors") or response_data.get("title"):
+                    status = response_data.get("status", 0)
+                    if status in (429, 500, 502, 503, 504):
+                        raise APIError(f"API error: {response_data}")
+
             if first_page:
                 logger.info(f"Successfully fetched bookmarks for user: {user_id}")
-                # Return raw response for bookmark parsing service
-                return (
-                    first_page.model_dump()
-                    if hasattr(first_page, "model_dump")
-                    else first_page
-                )
+                return response_data
             else:
                 logger.warning(f"No bookmarks found for user: {user_id}")
                 return {"data": [], "meta": {"result_count": 0}}
@@ -227,6 +291,16 @@ class TwitterService:
             )
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def create_bookmark(
         self, access_token: str, user_id: str, x_id: int, tweet_id: str
     ):
@@ -248,10 +322,18 @@ class TwitterService:
                 id=str(x_id), body=request_body
             )
 
-            logger.info(f"Bookmark creation response: {response}")
-            return (
+            # Check for API errors
+            response_data = (
                 response.model_dump() if hasattr(response, "model_dump") else response
             )
+            if isinstance(response_data, dict):
+                if response_data.get("errors") or response_data.get("title"):
+                    status = response_data.get("status", 0)
+                    if status in (429, 500, 502, 503, 504):
+                        raise APIError(f"API error: {response_data}")
+
+            logger.info(f"Bookmark creation response: {response}")
+            return response_data
 
         except Exception as e:
             logger.error(
@@ -260,6 +342,16 @@ class TwitterService:
             )
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
+        retry=retry_if_exception_type(
+            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+        ),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.ERROR),
+        reraise=True,
+    )
     async def delete_bookmark(
         self, access_token: str, user_id: str, x_id: int, tweet_id: str
     ):
@@ -277,10 +369,18 @@ class TwitterService:
                 id=str(x_id), tweet_id=tweet_id
             )
 
-            logger.info(f"Bookmark deletion response: {response}")
-            return (
+            # Check for API errors
+            response_data = (
                 response.model_dump() if hasattr(response, "model_dump") else response
             )
+            if isinstance(response_data, dict):
+                if response_data.get("errors") or response_data.get("title"):
+                    status = response_data.get("status", 0)
+                    if status in (429, 500, 502, 503, 504):
+                        raise APIError(f"API error: {response_data}")
+
+            logger.info(f"Bookmark deletion response: {response}")
+            return response_data
 
         except Exception as e:
             logger.error(
