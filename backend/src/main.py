@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.v1.auth.routes import auth_router
 from src.v1.route.twitter import twitter_router
 from src.v1.route.user import user_router
+from src.v1.route.client import client_router
 
 
 @asynccontextmanager
@@ -73,6 +74,7 @@ setup_telemetry(app)
 app.include_router(auth_router, prefix=Settings.API_V1_PREFIX)
 app.include_router(twitter_router, prefix=Settings.API_V1_PREFIX)
 app.include_router(user_router, prefix=Settings.API_V1_PREFIX)
+app.include_router(client_router, prefix=Settings.API_V1_PREFIX)
 
 
 @app.get(f"{Settings.API_V1_PREFIX}/root")

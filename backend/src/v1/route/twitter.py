@@ -1,3 +1,4 @@
+#Direct in-app endpoint to fetch fresh data directly from X
 from fastapi import APIRouter, Request, Depends
 from src.v1.auth.service import AccessTokenBearer, auth_service
 from src.utils.log import get_logger
