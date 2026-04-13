@@ -1,8 +1,8 @@
-from src.v1.service.bookmark import BookmarkService
 from src.utils.xdk_client import xdk_client
 from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
 from src.v1.schemas.user import UserInfoFromX
+from xdk.users.models import CreateBookmarkRequest
 import logging
 from tenacity import (
     retry,
@@ -314,8 +314,6 @@ class TwitterService:
             self.client.access_token = access_token
 
             # Use XDK to create bookmark
-            from xdk.users.models import CreateBookmarkRequest
-
             request_body = CreateBookmarkRequest(tweet_id=tweet_id)
 
             response = self.client.users.create_bookmark(

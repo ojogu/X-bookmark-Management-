@@ -21,6 +21,10 @@ from src.v1.model import (
     Author as AuthorModel,
     Post as PostModel,
     Bookmark as BookmarkModel,
+    Folder as FolderModel,
+    Tag as TagModel,
+    bookmark_folders,
+    bookmark_tags,
 )
 
 # from src.v1.service.twitter import twitter_service
@@ -144,14 +148,6 @@ class BookmarkService:
         Returns:
             Dict with 'data', 'includes', 'meta' keys matching X API response format
         """
-        from src.v1.model.bookmark import (
-            Bookmark as BookmarkModel,
-            Folder as FolderModel,
-            bookmark_folders,
-        )
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.author import Author as AuthorModel
-
         logger.info(
             f"Fetching bookmarks from DB for user_id={user_id}, limit={limit}, offset={offset}, "
             f"search={search}, sort={sort}, tag_ids={tag_ids}, folder_id={folder_id}, unread={unread}"
@@ -507,8 +503,6 @@ class BookmarkService:
         Returns:
             True if deleted, False if not found
         """
-        from src.v1.model.post import Post as PostModel
-
         logger.info(f"Deleting bookmark for user_id={user_id}, tweet_id={tweet_id}")
 
         # First, find the post by tweet_id
@@ -558,8 +552,6 @@ class BookmarkService:
         Returns:
             List of folder objects with bookmark count
         """
-        from src.v1.model.bookmark import Folder as FolderModel, bookmark_folders
-
         logger.info(f"Fetching folders for user_id={user_id}")
 
         # Get folders with bookmark counts
@@ -603,8 +595,6 @@ class BookmarkService:
         Returns:
             Created folder object
         """
-        from src.v1.model.bookmark import Folder as FolderModel
-
         logger.info(f"Creating folder '{name}' for user_id={user_id}")
 
         # Check if folder with same name already exists
@@ -645,8 +635,6 @@ class BookmarkService:
         Returns:
             Updated folder object
         """
-        from src.v1.model.bookmark import Folder as FolderModel
-
         logger.info(f"Updating folder {folder_id} for user_id={user_id}")
 
         # Find folder
@@ -677,8 +665,6 @@ class BookmarkService:
         await db.refresh(folder)
 
         # Get bookmark count
-        from src.v1.model.bookmark import bookmark_folders
-
         count_result = await db.execute(
             sa.select(sa.func.count(bookmark_folders.c.bookmark_id)).where(
                 bookmark_folders.c.folder_id == folder.id
@@ -707,8 +693,6 @@ class BookmarkService:
         Returns:
             True if deleted
         """
-        from src.v1.model.bookmark import Folder as FolderModel
-
         logger.info(f"Deleting folder {folder_id} for user_id={user_id}")
 
         # Find folder
@@ -742,8 +726,6 @@ class BookmarkService:
         Returns:
             List of tag objects with bookmark count
         """
-        from src.v1.model.tag import Tag as TagModel, bookmark_tags
-
         logger.info(f"Fetching tags for user_id={user_id}")
 
         # Get all tags
@@ -790,8 +772,6 @@ class BookmarkService:
         Returns:
             Created tag object
         """
-        from src.v1.model.tag import Tag as TagModel
-
         logger.info(f"Creating tag '{name}' for user_id={user_id}")
 
         # Check if tag with same name already exists
@@ -840,8 +820,6 @@ class BookmarkService:
         Returns:
             Updated tag object
         """
-        from src.v1.model.tag import Tag as TagModel, bookmark_tags
-
         logger.info(f"Updating tag {tag_id} for user_id={user_id}")
 
         # Find tag
@@ -907,8 +885,6 @@ class BookmarkService:
         Returns:
             True if deleted
         """
-        from src.v1.model.tag import Tag as TagModel
-
         logger.info(f"Deleting tag {tag_id} for user_id={user_id}")
 
         # Find tag
@@ -949,8 +925,6 @@ class BookmarkService:
         Returns:
             True if marked, False if not found
         """
-        from src.v1.model.post import Post as PostModel
-
         logger.info(f"Marking as read for user_id={user_id}, tweet_id={tweet_id}")
 
         # Find the post
@@ -995,8 +969,6 @@ class BookmarkService:
         Returns:
             True if marked, False if not found
         """
-        from src.v1.model.post import Post as PostModel
-
         logger.info(f"Marking as unread for user_id={user_id}, tweet_id={tweet_id}")
 
         # Find the post
@@ -1045,9 +1017,6 @@ class BookmarkService:
         Returns:
             True if added
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.bookmark import bookmark_folders
-
         logger.info(f"Adding bookmark {tweet_id} to folder {folder_id}")
 
         # Find the post
@@ -1109,9 +1078,6 @@ class BookmarkService:
         Returns:
             True if removed
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.bookmark import bookmark_folders
-
         logger.info(f"Removing bookmark {tweet_id} from folder {folder_id}")
 
         # Find the post
@@ -1149,9 +1115,6 @@ class BookmarkService:
         Returns:
             List of folder objects
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.bookmark import Folder as FolderModel, bookmark_folders
-
         logger.info(f"Getting folders for bookmark {tweet_id}")
 
         # Find the post
@@ -1200,9 +1163,6 @@ class BookmarkService:
         Returns:
             True if added
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.tag import Tag as TagModel, bookmark_tags
-
         logger.info(f"Adding tag {tag_id} to bookmark {tweet_id}")
 
         # Find the post
@@ -1261,9 +1221,6 @@ class BookmarkService:
         Returns:
             True if removed
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.tag import Tag as TagModel, bookmark_tags
-
         logger.info(f"Removing tag {tag_id} from bookmark {tweet_id}")
 
         # Find the post
@@ -1311,9 +1268,6 @@ class BookmarkService:
         Returns:
             List of tag objects
         """
-        from src.v1.model.post import Post as PostModel
-        from src.v1.model.tag import Tag as TagModel, bookmark_tags
-
         logger.info(f"Getting tags for bookmark {tweet_id}")
 
         # Find the post

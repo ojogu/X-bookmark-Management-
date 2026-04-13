@@ -7,10 +7,10 @@ from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
 from src.v1.service.interfaces import TokenRefreshService
 from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
-from datetime import timedelta
 import base64
 import httpx
 import logging
+import secrets
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -54,8 +54,6 @@ class TwitterAuthService(TokenRefreshService):
             logger.info(
                 f"XDK client configuration - client_id: {config.client_id[:10]}..., redirect_uri: {config.redirect_uri}"
             )
-
-            import secrets
 
             state = secrets.token_urlsafe(32)
             logger.debug(f"Generated secure state parameter: {state[:10]}...")

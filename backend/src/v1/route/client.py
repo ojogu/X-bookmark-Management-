@@ -6,6 +6,7 @@ from src.v1.model.users import User
 from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
 from src.v1.service.bookmark import BookmarkService
+from src.v1.service.user import UserService
 from src.v1.route.dependencies import get_current_user, get_bookmark_service
 from src.v1.base.exception import BadRequest
 from src.celery.task import front_sync_bookmark_task
@@ -244,7 +245,6 @@ async def get_folders(
 # --------------------------------------------------------------
 # Create a new folder for the current user.
 # --------------------------------------------------------------
-from pydantic import BaseModel
 
 
 class CreateFolderRequest(BaseModel):
@@ -405,8 +405,6 @@ async def get_user_info(
     db: AsyncSession = Depends(get_session),
 ):
     """Get current user profile info."""
-    from src.v1.service.user import UserService
-
     user_service = UserService(db=db)
     user_info = await user_service.get_user_info(str(current_user.id))
     return user_info
