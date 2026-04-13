@@ -1,46 +1,52 @@
+import { Link } from 'react-router-dom'
+
+const productLinks = ['Features', 'Pricing', 'Blog']
+const legalLinks = ['Privacy', 'Terms', 'Support']
+
 export default function Footer() {
   return (
-    <footer style={{
-      background: 'var(--bg-subtle)',
-      borderTop: '0.5px solid var(--border)',
-    }}>
-      <div style={{
-        maxWidth: 1280, margin: '0 auto',
-        padding: '3rem 2rem',
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem',
-      }}>
+    <footer className="border-t border-border-subtle">
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-10 md:flex-row md:justify-between">
+          {/* Brand */}
+          <div>
+            <Link to="/" className="font-serif italic text-xl text-text-primary">
+              Save<span className="text-brand-mid">Stack</span>
+            </Link>
+            <p className="mt-1.5 text-sm text-text-muted">Your bookmarks, organized.</p>
+            <p className="mt-6 text-xs text-text-muted">
+              © 2026 SaveStack · Built by Ojogu
+            </p>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{
-            fontFamily: 'var(--font-serif)', fontSize: 20,
-            fontStyle: 'italic', color: 'var(--text-primary)',
-            display: 'block',
-          }}>
-            SaveStack
-          </span>
-          <span style={{
-            fontSize: 11, color: 'var(--text-muted)',
-            letterSpacing: '0.06em', textTransform: 'uppercase',
-            display: 'block',
-          }}>
-            © 2026 SaveStack · Built by Ojogu
-          </span>
+          {/* Links */}
+          <div className="flex gap-12">
+            <div className="flex flex-col gap-3">
+              <span className="text-label text-text-muted">Product</span>
+              {productLinks.map(l => (
+                <a
+                  key={l}
+                  href="#"
+                  className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {l}
+                </a>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3">
+              <span className="text-label text-text-muted">Legal</span>
+              {legalLinks.map(l => (
+                <a
+                  key={l}
+                  href="#"
+                  className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {l}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
-
-        <div style={{ display: 'flex', gap: '2.5rem' }}>
-          {['Terms', 'Privacy', 'Support'].map(link => (
-            <a key={link} href="#" style={{
-              fontSize: 11, color: 'var(--text-muted)',
-              letterSpacing: '0.06em', textTransform: 'uppercase',
-              textDecoration: 'none', transition: 'color 100ms',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-mid)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            >{link}</a>
-          ))}
-        </div>
-
       </div>
     </footer>
   )

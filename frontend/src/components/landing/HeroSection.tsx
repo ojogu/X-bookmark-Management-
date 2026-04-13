@@ -1,73 +1,61 @@
 import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/ui/button'
+import { ArrowDown } from 'lucide-react'
+
+function XLogo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
 
 export default function HeroSection() {
   const { loginWithX } = useAuth()
 
   return (
-    <section style={{ padding: '6rem 1.5rem 8rem', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
+    <section className="flex flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8 lg:py-32">
+      {/* Badge */}
+      <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-light px-3 py-1.5">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-mid" />
+        <span className="text-label text-brand-mid">Now syncing your X bookmarks</span>
+      </div>
 
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '5px 14px', borderRadius: 'var(--radius-full)',
-          background: 'var(--accent-light)', border: '0.5px solid var(--accent-mid)',
-          color: 'var(--accent-mid)', fontSize: 11, fontWeight: 500,
-          letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2rem',
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-mid)', display: 'inline-block' }} />
-          Now syncing your X bookmarks
-        </div>
+      {/* Headline */}
+      <h1 className="text-display mb-6 max-w-4xl text-5xl sm:text-6xl lg:text-7xl">
+        <span className="text-text-primary">Your X bookmarks,</span>
+        <br />
+        <span className="text-brand-mid">finally organized.</span>
+      </h1>
 
-        <h1 style={{
-          fontFamily: 'var(--font-serif)', fontSize: 'clamp(2.8rem, 6vw, 4.5rem)',
-          fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.5px',
-          color: 'var(--text-primary)', marginBottom: '2rem',
-        }}>
-          Your X bookmarks,<br />
-          <em style={{ fontStyle: 'italic', color: 'var(--accent-mid)' }}>finally organized</em>
-        </h1>
+      {/* Subtext */}
+      <p className="mb-10 max-w-xl text-lg leading-relaxed text-text-secondary">
+        Stop losing threads in the void. SaveStack automatically syncs every post
+        you've saved and makes them searchable in seconds.
+      </p>
 
-        <p style={{
-          fontFamily: 'var(--font-sans)', fontSize: '1.1rem',
-          color: 'var(--text-secondary)', lineHeight: 1.7,
-          maxWidth: 560, margin: '0 auto 3rem',
-        }}>
-          SaveStack connects to your X account and gives your saved posts the home they deserve. No more losing threads or scrolling for hours.
-        </p>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button
-            onClick={loginWithX}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 500,
-              color: '#fff', background: 'var(--accent)', border: 'none',
-              borderRadius: 'var(--radius-lg)', padding: '0.85rem 2rem', cursor: 'pointer',
-            }}>
-            <XLogo />
-            Connect with X
-          </button>
-          <button
-            onClick={loginWithX}
-            style={{
-              fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 500,
-              color: 'var(--text-secondary)', background: 'transparent',
-              border: '0.5px solid var(--border-strong)',
-              borderRadius: 'var(--radius-lg)', padding: '0.85rem 2rem', cursor: 'pointer',
-            }}>
-            See how it works
-          </button>
-        </div>
-
+      {/* CTAs */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button
+          onClick={loginWithX}
+          size="lg"
+          className="h-auto gap-2.5 rounded-xl px-8 py-3.5 text-base"
+        >
+          <XLogo />
+          Connect with X
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          className="h-auto gap-2 rounded-xl px-8 py-3.5 text-base text-text-secondary"
+          onClick={() => {
+            document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+          }}
+        >
+          See how it works
+          <ArrowDown size={16} />
+        </Button>
       </div>
     </section>
-  )
-}
-
-function XLogo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
   )
 }

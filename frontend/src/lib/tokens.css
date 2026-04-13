@@ -1,61 +1,156 @@
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource/instrument-serif";
 @import "tailwindcss";
 
+/* ================================================================
+   Design Tokens — SaveStack Dark Theme
+   ================================================================ */
+
 :root {
+  /* Fonts */
   --font-sans: 'DM Sans', sans-serif;
   --font-serif: 'Instrument Serif', serif;
 
-  --bg: #FAFAF8;
-  --bg-card: #FFFFFF;
-  --bg-subtle: #F3F2EE;
+  /* ── Brand accent — Emerald ─────────────────────────────────── */
+  --brand: #10B981;
+  --brand-mid: #34D399;
+  --brand-light: rgba(16, 185, 129, 0.10);
+  --brand-hover: #059669;
 
-  --text-primary: #1A1A18;
-  --text-secondary: #6B6B67;
-  --text-muted: #A0A09C;
+  /* ── Page surfaces ──────────────────────────────────────────── */
+  --bg: #0C0C0E;
+  --bg-card: #131318;
+  --bg-subtle: #1A1A22;
 
-  --accent: #1A6B4A;
-  --accent-mid: #1D9E75;
-  --accent-light: #E1F5EE;
-  --accent-hover: #155c3e;
+  /* ── Text ───────────────────────────────────────────────────── */
+  --text-primary: #F0F0F4;
+  --text-secondary: #9090A8;
+  --text-muted: #5A5A72;
 
-  --border: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.14);
+  /* ── Borders ────────────────────────────────────────────────── */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 100px;
+  /* ── Radius ─────────────────────────────────────────────────── */
+  --radius: 8px;
+
+  /* ================================================================
+     shadcn/ui semantic variables
+     Components reference these directly via var(--*)
+     ================================================================ */
+  --background:               #0C0C0E;
+  --foreground:               #F0F0F4;
+  --card:                     #131318;
+  --card-foreground:          #F0F0F4;
+  --popover:                  #1E1E28;
+  --popover-foreground:       #F0F0F4;
+  --primary:                  #10B981;
+  --primary-foreground:       #ffffff;
+  --secondary:                #1A1A22;
+  --secondary-foreground:     #F0F0F4;
+  --muted:                    #1A1A22;
+  --muted-foreground:         #9090A8;
+  --accent:                   rgba(16, 185, 129, 0.10);
+  --accent-foreground:        #F0F0F4;
+  --destructive:              #EF4444;
+  --destructive-foreground:   #ffffff;
+  --border:                   rgba(255, 255, 255, 0.07);
+  --input:                    #1A1A22;
+  --ring:                     #34D399;
+
+  /* ── shadcn sidebar vars ──────────────────────────────────── */
+  --sidebar:                        #0C0C0E;
+  --sidebar-foreground:             #F0F0F4;
+  --sidebar-primary:                #10B981;
+  --sidebar-primary-foreground:     #ffffff;
+  --sidebar-accent:                 rgba(16, 185, 129, 0.10);
+  --sidebar-accent-foreground:      #34D399;
+  --sidebar-border:                 rgba(255, 255, 255, 0.07);
+  --sidebar-ring:                   #34D399;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111110;
-    --bg-card: #1C1C1A;
-    --bg-subtle: #242422;
+/* ── Map CSS vars → Tailwind utility classes ─────────────────── */
+@theme inline {
+  /* Brand */
+  --color-brand:        var(--brand);
+  --color-brand-mid:    var(--brand-mid);
+  --color-brand-light:  var(--brand-light);
+  --color-brand-hover:  var(--brand-hover);
 
-    --text-primary: #F0EFE8;
-    --text-secondary: #A0A09C;
-    --text-muted: #6B6B67;
+  /* Surfaces */
+  --color-bg:           var(--bg);
+  --color-bg-card:      var(--bg-card);
+  --color-bg-subtle:    var(--bg-subtle);
 
-    --accent: #1D9E75;
-    --accent-mid: #5DCAA5;
-    --accent-light: #04342C;
-    --accent-hover: #25b585;
+  /* Text */
+  --color-text-primary:    var(--text-primary);
+  --color-text-secondary:  var(--text-secondary);
+  --color-text-muted:      var(--text-muted);
 
-    --border: rgba(255, 255, 255, 0.07);
-    --border-strong: rgba(255, 255, 255, 0.13);
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  /* shadcn semantic → Tailwind utilities */
+  --color-background:               var(--background);
+  --color-foreground:               var(--foreground);
+  --color-card:                     var(--card);
+  --color-card-foreground:          var(--card-foreground);
+  --color-popover:                  var(--popover);
+  --color-popover-foreground:       var(--popover-foreground);
+  --color-primary:                  var(--primary);
+  --color-primary-foreground:       var(--primary-foreground);
+  --color-secondary:                var(--secondary);
+  --color-secondary-foreground:     var(--secondary-foreground);
+  --color-muted:                    var(--muted);
+  --color-muted-foreground:         var(--muted-foreground);
+  --color-accent:                   var(--accent);
+  --color-accent-foreground:        var(--accent-foreground);
+  --color-destructive:              var(--destructive);
+  --color-destructive-foreground:   var(--destructive-foreground);
+  --color-border:                   var(--border);
+  --color-input:                    var(--input);
+  --color-ring:                     var(--ring);
+
+  /* Sidebar */
+  --color-sidebar:                      var(--sidebar);
+  --color-sidebar-foreground:           var(--sidebar-foreground);
+  --color-sidebar-primary:              var(--sidebar-primary);
+  --color-sidebar-primary-foreground:   var(--sidebar-primary-foreground);
+  --color-sidebar-accent:               var(--sidebar-accent);
+  --color-sidebar-accent-foreground:    var(--sidebar-accent-foreground);
+  --color-sidebar-border:               var(--sidebar-border);
+  --color-sidebar-ring:                 var(--sidebar-ring);
+}
+
+/* ── Typography utilities ────────────────────────────────────── */
+@utility text-display {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+@utility text-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ── Global base ──────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-}
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
 }

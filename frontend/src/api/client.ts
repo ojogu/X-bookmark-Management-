@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 import { authStore } from '@/store/auth'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
@@ -35,8 +35,9 @@ client.interceptors.response.use(
   response => response,
   async error => {
     const original = error.config
+    const status = error.response?.status
 
-    if (error.response?.status !== 401 || original._retry) {
+    if (status !== 401 || original._retry) {
       return Promise.reject(error)
     }
 
@@ -80,5 +81,23 @@ client.interceptors.response.use(
     }
   }
 )
+
+// Helper methods for common HTTP verbs
+export const api = {
+  get: <T>(url: string, config?: AxiosRequestConfig) =>
+    client.get<T>(url, config).then(res => res.data),
+  
+  post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    client.post<T>(url, data, config).then(res => res.data),
+  
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    client.put<T>(url, data, config).then(res => res.data),
+  
+  delete: <T>(url: string, config?: AxiosRequestConfig) =>
+    client.delete<T>(url, config).then(res => res.data),
+  
+  patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    client.patch<T>(url, data, config).then(res => res.data),
+}
 
 export default client

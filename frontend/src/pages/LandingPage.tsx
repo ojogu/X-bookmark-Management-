@@ -5,6 +5,8 @@ import Footer from '@/components/common/Footer'
 import HeroSection from '@/components/landing/HeroSection'
 import AppMockup from '@/components/landing/AppMockup'
 import FeaturesSection from '@/components/landing/FeaturesSection'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import CTASection from '@/components/landing/CTASection'
 import { authStore } from '@/store/auth'
 
 export default function LandingPage() {
@@ -17,12 +19,14 @@ export default function LandingPage() {
   }, [navigate])
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="min-h-screen bg-bg">
       <Navbar />
       <main>
         <HeroSection />
         <AppMockup />
         <FeaturesSection />
+        <HowItWorksSection />
+        <CTASection />
       </main>
       <Footer />
     </div>

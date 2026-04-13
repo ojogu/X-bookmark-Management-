@@ -1,20 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { authStore } from '@/store/auth'
+import { useFetchUserInfoFresh, useTriggerSync } from '@/features/bookmarks/hooks'
 
-type Status = 'loading' | 'error'
+type OnboardingStep = 'connecting' | 'fetching_profile' | 'syncing_bookmarks' | 'done'
+type Status = 'onboarding' | 'success' | 'error'
 
-const messages = [
-  'Connecting your X account...',
-  'Reading your saved posts...',
-  'Building your library...',
-  'Almost done...',
-]
+const onboardingMessages: Record<OnboardingStep, string> = {
+  connecting: 'Connecting your X account…',
+  fetching_profile: 'Getting your profile…',
+  syncing_bookmarks: 'Reading your saved posts…',
+  done: 'Building your library…',
+}
 
 export default function CallbackPage() {
   const navigate = useNavigate()
-  const [status, setStatus] = useState<Status>('loading')
-  const [messageIndex, setMessageIndex] = useState(0)
+  const [status, setStatus] = useState<Status>('onboarding')
+  const [step, setStep] = useState<OnboardingStep>('connecting')
+
+  const fetchUserInfoFresh = useFetchUserInfoFresh()
+  const triggerSync = useTriggerSync()
 
   useEffect(() => {
     if (authStore.isAuthenticated()) {
@@ -22,13 +29,6 @@ export default function CallbackPage() {
       return
     }
   }, [navigate])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMessageIndex(i => (i + 1) % messages.length)
-    }, 1800)
-    return () => clearInterval(interval)
-  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -42,85 +42,85 @@ export default function CallbackPage() {
     }
 
     authStore.setTokens(accessToken, refreshToken)
+    window.history.replaceState({}, '', '/callback')
 
-    // Clean tokens from URL then redirect
-    window.history.replaceState({}, '', '/dashboard')
-    setTimeout(() => navigate('/dashboard', { replace: true }), 800)
+    runOnboarding()
   }, [navigate])
 
+  const runOnboarding = async () => {
+    try {
+      setStep('fetching_profile')
+      await fetchUserInfoFresh.mutateAsync()
+
+      setStep('syncing_bookmarks')
+      await triggerSync.mutateAsync()
+
+      setStep('done')
+      setTimeout(() => {
+        setStatus('success')
+        navigate('/dashboard/profile', { replace: true })
+      }, 600)
+    } catch {
+      setStatus('error')
+    }
+  }
+
   return (
-    <div style={{
-      minHeight: '100vh', background: 'var(--bg)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: '2rem',
-    }}>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-bg px-4">
+      <Link to="/" className="font-serif italic text-2xl text-text-primary">
+        Save<span className="text-brand-mid">Stack</span>
+      </Link>
 
-      {/* Logo */}
-      <span style={{
-        fontFamily: 'var(--font-serif)', fontSize: 24,
-        fontStyle: 'italic', color: 'var(--text-primary)',
-      }}>SaveStack</span>
-
-      {status === 'loading' && (
-        <>
-          {/* Progress bar */}
-          <div style={{
-            width: 200, height: 2,
-            background: 'var(--border)', borderRadius: 'var(--radius-full)',
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%', background: 'var(--accent-mid)',
-              borderRadius: 'var(--radius-full)',
-              animation: 'pulse-bar 1.5s ease-in-out infinite',
-            }} />
+      {status === 'onboarding' && (
+        <div className="flex flex-col items-center gap-6">
+          <div className="h-px w-48 overflow-hidden rounded-full bg-border-subtle">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ animation: 'callback-bar 1.8s ease-in-out infinite' }}
+            />
           </div>
 
-          {/* Status message */}
-          <p style={{
-            fontSize: 14, color: 'var(--text-secondary)',
-            fontFamily: 'var(--font-sans)', textAlign: 'center',
-            transition: 'opacity 300ms',
-          }}>
-            {messages[messageIndex]}
-          </p>
+          <p className="text-sm text-text-secondary">{onboardingMessages[step]}</p>
 
-          <p style={{
-            fontSize: 12, color: 'var(--text-muted)',
-            fontFamily: 'var(--font-sans)', textAlign: 'center',
-            maxWidth: 300, lineHeight: 1.6,
-          }}>
+          <p className="max-w-xs text-center text-xs leading-relaxed text-text-muted">
             First-time import may take a moment depending on how many posts you've saved.
           </p>
-        </>
+        </div>
+      )}
+
+      {status === 'success' && (
+        <div className="flex flex-col items-center gap-6">
+          <div className="h-px w-48 overflow-hidden rounded-full bg-border-subtle">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <p className="text-sm text-text-secondary">All done!</p>
+        </div>
       )}
 
       {status === 'error' && (
-        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <p style={{ fontSize: 14, color: '#E24B4A', fontFamily: 'var(--font-sans)' }}>
-            Something went wrong. Please try again.
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
-              color: '#fff', background: 'var(--accent)', border: 'none',
-              borderRadius: 'var(--radius-md)', padding: '0.6rem 1.5rem', cursor: 'pointer',
-            }}>
-            Back to Home
-          </button>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+            <span className="text-xl text-destructive">✕</span>
+          </div>
+          <p className="text-sm text-text-primary">Something went wrong</p>
+          <p className="text-xs text-text-muted">Please try connecting your X account again.</p>
+          <Button onClick={() => navigate('/')} variant="outline">
+            Back to home
+          </Button>
         </div>
       )}
 
       <style>{`
-        @keyframes pulse-bar {
-          0% { width: 0%; margin-left: 0; }
-          50% { width: 70%; margin-left: 15%; }
-          100% { width: 0%; margin-left: 100%; }
+        @keyframes callback-bar {
+          0%   { width: 0%;   margin-left: 0; }
+          50%  { width: 60%;  margin-left: 20%; }
+          100% { width: 0%;   margin-left: 100%; }
         }
       `}</style>
-
     </div>
   )
 }

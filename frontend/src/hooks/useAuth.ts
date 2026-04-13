@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { authStore } from '@/store/auth'
 import client from '@/api/client'
 
@@ -17,9 +18,20 @@ export function useAuth() {
     }
     }
 
-  function logout() {
-    authStore.clearTokens()
-    navigate('/')
+  async function logout() {
+    try {
+      const refreshToken = authStore.getRefreshToken()
+      if (refreshToken) {
+        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, null, {
+          headers: { Authorization: `Bearer ${refreshToken}` },
+        })
+      }
+    } catch {
+      // Ignore errors - proceed with local logout anyway
+    } finally {
+      authStore.clearTokens()
+      navigate('/')
+    }
   }
 
   function isAuthenticated() {

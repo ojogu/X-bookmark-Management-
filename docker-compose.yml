@@ -51,6 +51,8 @@ services:
     command: celery -A src.celery.celery worker -l info
     env_file:
       - ./backend/.env
+    environment:
+      - CELERY_WORKER=true
     deploy:
       resources:
         limits:
@@ -76,6 +78,8 @@ services:
     command: celery -A src.celery.celery beat -l info
     env_file:
       - ./backend/.env
+    environment:
+      - CELERY_WORKER=true
     deploy:
       resources:
         limits:

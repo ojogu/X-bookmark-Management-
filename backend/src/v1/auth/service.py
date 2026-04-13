@@ -5,15 +5,22 @@ import uuid
 from cryptography.fernet import Fernet
 from src.utils.config import config
 from src.v1.base.exception import TokenExpired
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+)
 from src.v1.base.exception import InvalidToken
 
 from src.utils.log import get_logger
+
 logger = get_logger(__name__)
+
 
 def encryption_key():
     cipher = Fernet(config.encryption_key)
     return cipher
+
 
 def encrypt_token(token: str) -> str:
     """
@@ -34,7 +41,7 @@ def encrypt_token(token: str) -> str:
     encrypted_bytes = cipher.encrypt(raw_token)
 
     # 3. Convert to string for DB storage
-    token_to_store = encrypted_bytes.decode('utf-8')
+    token_to_store = encrypted_bytes.decode("utf-8")
 
     return token_to_store
 
@@ -48,7 +55,7 @@ def decrypt_token(encrypted_token: str) -> str:
 
     Returns:
         Decrypted token as a string
-        
+
     Raises:
         Exception: If decryption fails
     """
@@ -62,102 +69,108 @@ def decrypt_token(encrypted_token: str) -> str:
         decrypted_bytes = cipher.decrypt(encrypted_bytes)
 
         # 3. Convert to string
-        decrypted_token = decrypted_bytes.decode('utf-8')
+        decrypted_token = decrypted_bytes.decode("utf-8")
 
         logger.info("Token decrypted successfully")
         return decrypted_token
-        
+
     except Exception as e:
         logger.error(f"Error decrypting token: {str(e)}", exc_info=True)
         raise
 
 
-class AuthService():
-    """this class handles in-app authentication (jwt access token, refresh token)
-    """
-    
+class AuthService:
+    """this class handles in-app authentication (jwt access token, refresh token)"""
+
     def __init__(self):
         pass
-    
-    def create_access_token(self, user_data:dict, expiry:timedelta=None, refresh:bool = False):
+
+    def create_access_token(
+        self, user_data: dict, expiry: timedelta = None, refresh: bool = False
+    ):
         try:
             payload = {}
             payload["user"] = user_data
-            to_expire = expiry if expiry is not None else timedelta(seconds=config.access_token_expiry)
+            to_expire = (
+                expiry
+                if expiry is not None
+                else timedelta(seconds=config.access_token_expiry)
+            )
             payload["exp"] = datetime.now() + to_expire
             payload["jti"] = str(uuid.uuid4())
             payload["refresh"] = refresh
-            
+
             token = jwt.encode(
-                payload=payload,
-                key=config.jwt_secret_key,
-                algorithm=config.jwt_algo
+                payload=payload, key=config.jwt_secret_key, algorithm=config.jwt_algo
             )
             logger.info(f"access token created for user: {user_data.get('id')}")
             return token
         except Exception as e:
-            logger.error(f"error creating access token for user {user_data.get('id')}: {e}", exc_info=True)
+            logger.error(
+                f"error creating access token for user {user_data.get('id')}: {e}",
+                exc_info=True,
+            )
             raise
-    
-    def decode_token(self, token:str)-> dict:
+
+    def decode_token(self, token: str) -> dict:
         try:
             token_data = jwt.decode(
-                jwt=token,
-                key=config.jwt_secret_key,
-                algorithms=[config.jwt_algo]
+                jwt=token, key=config.jwt_secret_key, algorithms=[config.jwt_algo]
             )
-            logger.info(f"token decoded successfully for user: {token_data.get('user').get('id')}")
+            logger.info(
+                f"token decoded successfully for user: {token_data.get('user').get('id')}"
+            )
             return token_data
         except jwt.ExpiredSignatureError as e:
             logger.error(f"token expired for user: {e}", exc_info=True)
             raise TokenExpired("token has expired")
-        
+
         except jwt.InvalidSignatureError as e:
             logger.error(f"invalid token signature: {e}", exc_info=True)
             raise TokenExpired("invalid token signature")
-        
+
         except jwt.PyJWTError as e:
             logger.error(f"error decoding token: {e}", exc_info=True)
             raise TokenExpired("error decoding token")
-        
+
     @staticmethod
     def encryption_key():
         cipher = Fernet(config.encryption_key)
         return cipher
 
-auth_service = AuthService()
 
+auth_service = AuthService()
 
 
 class TokenService(HTTPBearer):
     """
-        Custom HTTP Bearer authentication class for validating JWT access tokens.
+    Custom HTTP Bearer authentication class for validating JWT access tokens.
 
-        This class extends FastAPI's HTTPBearer to:
-        - Extract Bearer tokens from the Authorization header.
-        - Decode and validate the token using an external `auth_service`.
-        - Ensure the token is not a refresh token.
-        - Raise a custom `InvalidToken` exception if the token is invalid or missing required data.
+    This class extends FastAPI's HTTPBearer to:
+    - Extract Bearer tokens from the Authorization header.
+    - Decode and validate the token using an external `auth_service`.
+    - Ensure the token is not a refresh token.
+    - Raise a custom `InvalidToken` exception if the token is invalid or missing required data.
 
-        Usage:
-            Use as a dependency in FastAPI routes to protect endpoints and extract token data.
+    Usage:
+        Use as a dependency in FastAPI routes to protect endpoints and extract token data.
 
-        Example:
-            access_token_service = AccessTokenService()
+    Example:
+        access_token_service = AccessTokenService()
 
-            @router.get("/secure-endpoint")
-            async def secure_endpoint(user_data: dict = Depends(access_token_service)):
-                return {"user": user_data}
+        @router.get("/secure-endpoint")
+        async def secure_endpoint(user_data: dict = Depends(access_token_service)):
+            return {"user": user_data}
 
-        Args:
-            auto_error (bool): Whether to automatically raise an HTTPException
-                if authentication fails. Defaults to True.
+    Args:
+        auto_error (bool): Whether to automatically raise an HTTPException
+            if authentication fails. Defaults to True.
 
-        Raises:
-            InvalidToken: If the token is missing, invalid, expired, or is a refresh token.
-        """
+    Raises:
+        InvalidToken: If the token is missing, invalid, expired, or is a refresh token.
+    """
 
-    def __init__(self, auto_error: bool = True):
+    def __init__(self, auto_error: bool = False):
         super().__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request):
@@ -177,7 +190,7 @@ class TokenService(HTTPBearer):
         token_data = auth_service.decode_token(token)
 
         self.verify_token_data(token_data)
-        
+
         if token_data is None:
             raise InvalidToken("No data found in access token")
 
@@ -192,12 +205,13 @@ class TokenService(HTTPBearer):
             return token_data is not None
         except Exception:
             return False
-        
-    def verify_token_data(self, token_data:dict):
+
+    def verify_token_data(self, token_data: dict):
         raise NotImplementedError("Overide in the child classes ")
 
+
 class AccessTokenBearer(TokenService):
-    def verify_token_data(self, token_data:dict):
+    def verify_token_data(self, token_data: dict):
         """
         Verifies that the token data is a valid access token.
 
@@ -208,10 +222,13 @@ class AccessTokenBearer(TokenService):
             InvalidToken: If the token is a refresh token.
         """
         if token_data and token_data.get("refresh", False):
-            raise InvalidToken("Please provide a valid access token, not a refresh token")
-        
+            raise InvalidToken(
+                "Please provide a valid access token, not a refresh token"
+            )
+
+
 class RefreshTokenBearer(TokenService):
-    def verify_token_data(self, token_data:dict):
+    def verify_token_data(self, token_data: dict):
         """
         Verifies that the token data is a valid refresh token.
 

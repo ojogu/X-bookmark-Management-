@@ -1,3 +1,5 @@
+import os
+
 from celery import Celery
 from .celery_config import CeleryConfig
 from celery.schedules import crontab
@@ -20,8 +22,11 @@ bg_task.conf.broker_connection_retry_on_startup = True
 bg_task.config_from_object(CeleryConfig)
 
 # ── OpenTelemetry ─────────────────────────────────────────────────
-setup_telemetry(service_name="savestack-worker")  # distinct name from your API
-CeleryInstrumentor().instrument()
+# Only initialize when this process IS the worker.
+# Prevents polluting the FastAPI process when celery module is imported.
+if os.getenv("CELERY_WORKER") == "true":
+    setup_telemetry(service_name="savestack-worker") #distinct name from your API
+    CeleryInstrumentor().instrument()
 # ─────────────────────────────────────────────────────────────────
 
 interval = config.celery_beat_interval

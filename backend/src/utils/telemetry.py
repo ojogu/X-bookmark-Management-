@@ -103,7 +103,7 @@ def setup_telemetry(app=None, service_name: str = "save-stack-api"):
 
     # FastAPIInstrumentor wraps every route handler in a span automatically.
     # Captures HTTP method, route, status code, and latency out of the box.
-    if app is not None:
+    if app is not None and not FastAPIInstrumentor().is_instrumented_by_opentelemetry:
         FastAPIInstrumentor.instrument_app(app)
 
     # HTTPXClientInstrumentor wraps every outgoing httpx request in a child span.

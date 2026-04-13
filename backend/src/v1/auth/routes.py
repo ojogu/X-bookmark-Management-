@@ -117,6 +117,30 @@ async def handle_callback(
         )
 
 
+@auth_router.post("/logout", tags=["auth"])
+async def logout(token_details: dict = Depends(RefreshTokenBearer())):
+    """
+    Logout endpoint - invalidates the refresh token by blacklisting it.
+    Uses the same blacklisting logic as token refresh.
+    """
+    try:
+        jti = token_details["jti"]
+        if await key_exist(key=str(jti)):
+            raise InvalidToken("Refresh token has been revoked")
+
+        await set_cache(key=str(jti), data="")
+        logger.info(f"User logged out, token {jti} has been revoked")
+
+        return success_response(
+            message="Logged out successfully",
+            status_code=status.HTTP_200_OK,
+            data=None,
+        )
+    except Exception as e:
+        logger.error(f"Logout failed: {str(e)}")
+        raise
+
+
 @auth_router.get("/refresh-token", tags=["auth"])
 async def get_new_tokens_token(token_details: dict = Depends(RefreshTokenBearer())):
     # Check if refresh token is not blacklisted (additional check)

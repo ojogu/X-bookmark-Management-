@@ -95,6 +95,7 @@ def configure_structlog() -> None:
     # Quiet noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    print("Handlers:", root_logger.handlers)
 
 
 
