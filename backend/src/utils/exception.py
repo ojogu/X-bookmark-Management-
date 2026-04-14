@@ -1,4 +1,3 @@
-
 from typing import Any, Callable, Dict
 from fastapi import FastAPI, Request, HTTPException, status
 from src.v1.base.schema import ErrorResponse
@@ -21,22 +20,20 @@ from src.v1.base.exception import (
     EmailVerificationError,
     DatabaseError,
     ServerError,
-    NotActive, 
-    BaseExceptionClass
-    
-    
+    NotActive,
+    BaseExceptionClass,
+    ExternalAPIError,
 )
 from src.utils.log import get_logger
+
 exception_logger = get_logger(__name__)
-
-
 
 
 def create_exception_handler(
     status_code: int, initial_detail: Dict
 ) -> Callable[[Request, Exception], JSONResponse]:
     """Create a standardized exception handler"""
-    
+
     async def exception_handler(request: Request, exc: BaseExceptionClass):
         # Log the exception details
         exception_logger.error(f"Exception occurred: {str(exc)}")
@@ -57,7 +54,7 @@ def create_exception_handler(
 
 def register_error_handlers(app: FastAPI):
     """Register all exception handlers for the FastAPI app"""
-    
+
     # Custom exception handlers
     app.add_exception_handler(
         Environment_Variable_Exception,
@@ -68,9 +65,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Environment variable missing",
                 "error_code": "environment_variable_missing",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -82,11 +79,11 @@ def register_error_handlers(app: FastAPI):
                 "message": "Resource already in use",
                 "error_code": "resource_in_use",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
-    
+
     app.add_exception_handler(
         InvalidToken,
         create_exception_handler(
@@ -96,9 +93,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Invalid token",
                 "error_code": "access or refresh token invalid",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -111,9 +108,9 @@ def register_error_handlers(app: FastAPI):
                 "error_code": "token_expired",
                 "resolution": "Please get a new token",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -125,9 +122,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Resource not found",
                 "error_code": "not_found",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -139,9 +136,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Resource already exists",
                 "error_code": "already_exists",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -153,9 +150,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Invalid email or password",
                 "error_code": "invalid_credentials",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -167,9 +164,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Bad request",
                 "error_code": "bad_request",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -182,9 +179,9 @@ def register_error_handlers(app: FastAPI):
                 "error_code": "not_verified",
                 "resolution": "Please verify your account",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -196,9 +193,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Email verification failed",
                 "error_code": "email_verification_failed",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -210,9 +207,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Database error occurred",
                 "error_code": "database_error",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -224,9 +221,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Internal server error",
                 "error_code": "server_error",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
 
     app.add_exception_handler(
@@ -239,9 +236,23 @@ def register_error_handlers(app: FastAPI):
                 "error_code": "account_not_active",
                 "resolution": "Please activate your account",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        ExternalAPIError,
+        create_exception_handler(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            initial_detail={
+                "status": "error",
+                "message": "External API error",
+                "error_code": "external_api_error",
+                "data": None,
+                "role": None,
+            },
+        ),
     )
 
     # Built-in exception handlers
@@ -254,15 +265,15 @@ def register_error_handlers(app: FastAPI):
                 "message": "HTTP error occurred",
                 "error_code": "http_error",
                 "data": None,
-                "role": None
-            }
-        )
+                "role": None,
+            },
+        ),
     )
-
 
     """
     general exception handlers
     """
+
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         exception_logger.error(f"HTTP {exc.status_code}: {exc.detail}", exc_info=True)
@@ -272,22 +283,24 @@ def register_error_handlers(app: FastAPI):
                 "message": exc.detail,
                 "error_code": "http_error",
                 "data": None,
-                "role": None
+                "role": None,
             },
-            status_code=exc.status_code
+            status_code=exc.status_code,
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
         error_details = []
         for error in exc.errors():
             field = " -> ".join(str(loc) for loc in error["loc"])
             message = error["msg"]
             error_details.append(f"{field}: {message}")
-        
+
         error_message = "; ".join(error_details)
         exception_logger.error(f"Validation error: {error_message}")
-        
+
         return JSONResponse(
             content={
                 "status": "error",
@@ -295,7 +308,7 @@ def register_error_handlers(app: FastAPI):
                 "error_code": "validation_error",
                 "data": exc.errors(),
             },
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
     @app.exception_handler(ValidationError)
@@ -307,9 +320,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Validation error",
                 "error_code": "pydantic_validation_error",
                 "data": exc.json(),
-                "model": exc.model.__name__ 
+                "model": exc.model.__name__,
             },
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
     @app.exception_handler(IntegrityError)
@@ -321,9 +334,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Integrity error: An object with this value already exists",
                 "error_code": "integrity_error",
                 "data": None,
-                "role": None
+                "role": None,
             },
-            status_code=status.HTTP_409_CONFLICT
+            status_code=status.HTTP_409_CONFLICT,
         )
 
     @app.exception_handler(SQLAlchemyError)
@@ -335,9 +348,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Database error",
                 "error_code": "database_error",
                 "data": None,
-                "role": None
+                "role": None,
             },
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     @app.exception_handler(500)
@@ -349,9 +362,9 @@ def register_error_handlers(app: FastAPI):
                 "message": "Oops! Something went wrong",
                 "error_code": "server_error",
                 "data": None,
-                "role": None
+                "role": None,
             },
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     # # General exception handler (catch-all)
@@ -368,8 +381,6 @@ def register_error_handlers(app: FastAPI):
     #         },
     #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
     #     )
-
-
 
 
 # Usage example:

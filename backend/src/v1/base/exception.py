@@ -1,17 +1,20 @@
-
 # Custom Exception Classes
+
 
 class BaseExceptionClass(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
 
+
 class Environment_Variable_Exception(BaseExceptionClass):
-    pass 
+    pass
 
 
 class InUseError(BaseExceptionClass):
     pass
+
+
 class InvalidToken(BaseExceptionClass):
     pass
 
@@ -53,4 +56,8 @@ class ServerError(BaseExceptionClass):
 
 
 class NotActive(BaseExceptionClass):
+    pass
+
+
+class ExternalAPIError(BaseExceptionClass):
     pass

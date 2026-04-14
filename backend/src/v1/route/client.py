@@ -1,9 +1,6 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.utils.db import get_session
 from src.utils.log import get_logger
 from src.v1.model.users import User
-from src.v1.service.user import UserService
 from src.v1.route.dependencies import get_current_user
 from pydantic import BaseModel
 
@@ -14,6 +11,7 @@ client_router = APIRouter(prefix="/client", tags=["client"])
 from src.v1.route.bookmark import bookmark_router
 from src.v1.route.folder import folder_router
 from src.v1.route.tag import tag_router
+from src.v1.route.user import user_router
 
 
 class SyncResponse(BaseModel):
@@ -42,17 +40,7 @@ async def trigger_sync(
     )
 
 
-@client_router.get("/user/info")
-async def get_user_info(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_session),
-):
-    """Get current user profile info."""
-    user_service = UserService(db=db)
-    user_info = await user_service.get_user_info(str(current_user.id))
-    return user_info
-
-
 client_router.include_router(bookmark_router)
 client_router.include_router(folder_router)
 client_router.include_router(tag_router)
+client_router.include_router(user_router)

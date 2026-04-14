@@ -300,7 +300,7 @@ export function useProfile() {
   return useQuery({
     queryKey: bookmarkKeys.profile,
     queryFn: async () => {
-      const res = await client.get<UserProfile>('/client/user/info')
+      const res = await client.get<UserProfile>('/client/info')
       return res.data
     },
     staleTime: 5 * 60 * 1000,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
 from src.utils.log import get_logger
@@ -7,7 +7,7 @@ from src.v1.service.utils import get_valid_tokens
 from src.v1.service.twitter import twitter_service
 from src.v1.service.bookmark import BookmarkService
 from src.v1.route.dependencies import get_current_user, get_bookmark_service
-from src.v1.base.exception import BadRequest
+from src.v1.base.exception import BadRequest, ExternalAPIError
 from pydantic import BaseModel
 from typing import Optional
 
@@ -141,11 +141,11 @@ async def delete_bookmark(
             tweet_id=bookmark_id,
         )
         logger.info(f"Successfully deleted bookmark {bookmark_id} from X API")
+    #TODO: don't delete from X in the req-res cycle, move to queue
     except Exception as e:
         logger.error(f"Failed to delete bookmark {bookmark_id} from X API: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to delete from X: {str(e)}. Local record preserved.",
+        raise ExternalAPIError(
+            f"Failed to delete from X: {str(e)}. Local record preserved."
         )
 
     await bookmark_service.delete_bookmark(db, str(user_id), bookmark_id)

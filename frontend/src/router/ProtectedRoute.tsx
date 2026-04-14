@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       }
 
       try {
-        await client.get('/client/user/info')
+        await client.get('/client/info')
         setValidation('valid')
       } catch {
         authStore.clearTokens()
