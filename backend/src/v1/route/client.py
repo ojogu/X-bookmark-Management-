@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.route.dependencies import get_current_user
-from pydantic import BaseModel
+from src.v1.schemas import SyncResponse
 
 logger = get_logger(__name__)
 
@@ -12,11 +12,6 @@ from src.v1.route.bookmark import bookmark_router
 from src.v1.route.folder import folder_router
 from src.v1.route.tag import tag_router
 from src.v1.route.user import user_router
-
-
-class SyncResponse(BaseModel):
-    status: str
-    message: str
 
 
 @client_router.post("/sync", response_model=SyncResponse)

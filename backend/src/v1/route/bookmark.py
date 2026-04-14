@@ -233,3 +233,24 @@ async def get_bookmark_tags(
     user_id = current_user.id
     tags = await bookmark_service.get_bookmark_tags(db, user_id, bookmark_id)
     return tags
+
+
+@bookmark_router.get("/sync-status")
+async def get_sync_status(
+    current_user: User = Depends(get_current_user),
+    bookmark_service: BookmarkService = Depends(get_bookmark_service),
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Get sync status for the user's bookmarks.
+
+    Returns the last sync timestamp and backfill completion status.
+    """
+    user_id = current_user.id
+
+    last_sync_time = await bookmark_service.get_last_sync_time(db, user_id)
+
+    return {
+        "last_sync_time": last_sync_time.isoformat() if last_sync_time else None,
+        "is_backfill_complete": current_user.is_backfill_complete,
+    }

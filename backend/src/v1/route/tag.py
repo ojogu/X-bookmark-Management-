@@ -5,23 +5,12 @@ from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.service.tag import TagService
 from src.v1.route.dependencies import get_current_user, get_tag_service
-from pydantic import BaseModel
-from typing import Optional
+from src.v1.schemas import CreateTagRequest, UpdateTagRequest
 from uuid import UUID
 
 logger = get_logger(__name__)
 
 tag_router = APIRouter(prefix="/tags", tags=["tags"])
-
-
-class CreateTagRequest(BaseModel):
-    name: str
-    color: Optional[str] = None
-
-
-class UpdateTagRequest(BaseModel):
-    name: Optional[str] = None
-    color: Optional[str] = None
 
 
 @tag_router.get("")

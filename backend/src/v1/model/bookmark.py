@@ -64,21 +64,18 @@ class Folder(BaseModel):
     user = relationship("User", backref="folders")
 
 
-# Junction table for bookmark-folder many-to-many relationship
+# Junction table connecting bookmarks to folders.
+# This table establishes a many-to-many relationship between bookmarks
+# and folders. A bookmark can belong to multiple folders, and a folder
+# can contain multiple bookmarks.
+#
+# Primary Keys:
+# - bookmark_id: References bookmarks.id
+# - folder_id: References folders.id
+#
+# Delete Behavior: CASCADE - deleting a bookmark or folder removes the association.
 bookmark_folders = sa.Table(
-    """
-    Junction table connecting bookmarks to folders.
-
-    This table establishes a many-to-many relationship between bookmarks
-    and folders. A bookmark can belong to multiple folders, and a folder
-    can contain multiple bookmarks.
-
-    Primary Keys:
-    - bookmark_id: References bookmarks.id
-    - folder_id: References folders.id
-
-    Delete Behavior: CASCADE - deleting a bookmark or folder removes the association.
-    """,
+    "bookmarks_folders",
     BaseModel.metadata,
     sa.Column(
         "bookmark_id",

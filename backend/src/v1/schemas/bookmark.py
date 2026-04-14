@@ -2,6 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from datetime import datetime
 
+
 # ------------------
 # Author Info
 # ------------------
@@ -10,13 +11,9 @@ class Author(BaseModel):
     username: str
     name: str
     profile_image_url: Optional[HttpUrl] = None
-    
-    
-    model_config = ConfigDict(
-        ser_json_t_encoders={
-            HttpUrl: lambda v: str(v)
-        }
-    )
+
+    model_config = ConfigDict(ser_json_t_encoders={HttpUrl: lambda v: str(v)})
+
 
 # ------------------
 # Metrics Info
@@ -28,6 +25,7 @@ class Metrics(BaseModel):
     quote_count: int
     bookmark_count: int
     impression_count: int
+
 
 # ------------------
 # Post Info
@@ -41,6 +39,7 @@ class Post(BaseModel):
     lang: str
     possibly_sensitive: bool
 
+
 # ------------------
 # Bookmark Info (nested post + author)
 # ------------------
@@ -49,12 +48,15 @@ class Bookmark(BaseModel):
     post: Post
     author: Author
 
+
 # ------------------
 # Meta Info
 # ------------------
 class Meta(BaseModel):
     result_count: Optional[int] = 0
     next_token: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+
 
 # ------------------
 # Top-level Response
@@ -62,3 +64,18 @@ class Meta(BaseModel):
 class BookmarkResponse(BaseModel):
     bookmarks: List[Bookmark]
     meta: Meta
+
+
+# ------------------
+# Request Models
+# ------------------
+class MarkReadRequest(BaseModel):
+    is_read: bool
+
+
+class BookmarkFolderRequest(BaseModel):
+    folder_id: str
+
+
+class BookmarkTagRequest(BaseModel):
+    tag_id: str

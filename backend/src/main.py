@@ -32,9 +32,9 @@ async def life_span(app: FastAPI):
     # Run once at import time, to overide uvicorn setup
     configure_structlog()
 
-    # print(f"dropping db....")
-    # await drop_db()
-    # print(f"db dropped")
+    print(f"dropping db....")
+    await drop_db() 
+    print(f"db dropped")
 
     # Startup: Initialize the database
     print(f"server is starting....")

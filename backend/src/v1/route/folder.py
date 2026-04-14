@@ -5,20 +5,12 @@ from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.service.folder import FolderService
 from src.v1.route.dependencies import get_current_user, get_folder_service
-from pydantic import BaseModel
+from src.v1.schemas import CreateFolderRequest, UpdateFolderRequest
 from uuid import UUID
 
 logger = get_logger(__name__)
 
 folder_router = APIRouter(prefix="/folders", tags=["folders"])
-
-
-class CreateFolderRequest(BaseModel):
-    name: str
-
-
-class UpdateFolderRequest(BaseModel):
-    name: str
 
 
 @folder_router.get("")

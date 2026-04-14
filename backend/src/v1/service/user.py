@@ -192,7 +192,14 @@ class UserService:
 
     async def fetch_all_users_id(self):
         stmt = await self.db.execute(sa.select(User.id))
-        return stmt.scalars().all()  # scalars return multiple rows, but only the first column/object from each row.
+        return stmt.scalars().all()
+
+    async def fetch_pending_backfill_user_ids(self):
+        """Fetch users that haven't completed backfill yet."""
+        stmt = await self.db.execute(
+            sa.select(User.id).where(User.is_backfill_complete == False)
+        )
+        return stmt.scalars().all()
 
     # async def fetch_X_id_for_a_user(self, user_id:str):
     #     # user_id = await self.check_if_user_exists_user_id(user_id)

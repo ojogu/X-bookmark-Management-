@@ -25,9 +25,8 @@ async_session = async_sessionmaker(
 )
 
 
-
 @asynccontextmanager
-#this helps in a way that, each internal async function in the bg task gets a new session, which prevent event loop or connection issue, coupled with the poolclass=NullPool param when creating the engine, it opens a new connection 
+# this helps in a way that, each internal async function in the bg task gets a new session, which prevent event loop or connection issue, coupled with the poolclass=NullPool param when creating the engine, it opens a new connection
 async def get_async_db_session():
     """
     Get an async database session for use in background tasks.
@@ -72,7 +71,6 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-
 async def init_db():
     """
     Initialize the database by creating all tables defined in the Base metadata.
@@ -102,6 +100,9 @@ async def drop_db():
 
     Caution: This operation will delete all data in the tables. Use with care.
     """
-    async with engine.begin() as conn:
-        # Use run_sync to call the synchronous drop_all method in an async context
-        await conn.run_sync(Base.metadata.drop_all)
+    try:
+        async with engine.begin() as conn:
+            # Use run_sync to call the synchronous drop_all method in an async context
+            await conn.run_sync(Base.metadata.drop_all)
+    except SQLAlchemyError as e:
+        logger.error(f"error dropping the db: {e}")

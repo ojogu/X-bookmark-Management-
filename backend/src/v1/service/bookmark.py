@@ -87,6 +87,17 @@ class BookmarkService:
             return None
         return next_token.scalar_one_or_none()
 
+    async def fetch_front_sync_token(self, db: AsyncSession, user_id):
+        """Fetch the front_sync_token for front sync pagination."""
+        front_sync_token = await db.execute(
+            sa.select(BookmarkModel.front_sync_token).where(
+                user_id == BookmarkModel.user_id
+            )
+        )
+        if not front_sync_token:
+            return None
+        return front_sync_token.scalar_one_or_none()
+
     async def get_last_sync_time(self, db: AsyncSession, user_id):
         """Get the last successful front sync timestamp for a user."""
         result = await db.execute(
@@ -104,6 +115,13 @@ class BookmarkService:
             sa.update(User)
             .where(User.id == user_id)
             .values(last_front_sync_time=sync_time)
+        )
+        await db.commit()
+
+    async def mark_backfill_complete(self, db: AsyncSession, user_id):
+        """Mark backfill as complete for a user."""
+        await db.execute(
+            sa.update(User).where(User.id == user_id).values(is_backfill_complete=True)
         )
         await db.commit()
 
@@ -360,20 +378,23 @@ class BookmarkService:
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
-                    front_sync_token=next_token if sync_time else None,
-                    next_token=next_token or "",
                 )
+                if sync_time:
+                    bookmark.front_sync_token = next_token
+                else:
+                    bookmark.next_token = next_token or ""
                 db.add(bookmark)
+            else:
+                if sync_time:
+                    existing_bm.front_sync_token = next_token
+                else:
+                    existing_bm.next_token = next_token or ""
 
         if sync_time:
             logger.debug(
                 f"Updating last_front_sync_time for user {user_id} to {sync_time}"
             )
-            await db.execute(
-                sa.update(User)
-                .where(User.id == user_id)
-                .values(last_front_sync_time=sync_time)
-            )
+            await self.update_last_sync_time(db, user_id, sync_time)
 
         try:
             await db.commit()

@@ -33,6 +33,7 @@ class User(BaseModel):
     following_count = sa.Column(sa.Integer, default=0)
     last_user_info_update = sa.Column(sa.DateTime(timezone=True), nullable=True)
     last_front_sync_time = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    is_backfill_complete = sa.Column(sa.Boolean, default=False)
     token = relationship("UserToken", uselist=False, back_populates="user")
 
 

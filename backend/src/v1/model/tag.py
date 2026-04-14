@@ -32,21 +32,18 @@ class Tag(BaseModel):
     user = relationship("User", backref="tags")
 
 
-# Junction table for bookmark-tag many-to-many relationship
+# Junction table connecting bookmarks to tags.
+# This table establishes a many-to-many relationship between bookmarks
+# and tags. A bookmark can have multiple tags, and a tag can be applied
+# to multiple bookmarks.
+#
+# Primary Keys:
+# - bookmark_id: References bookmarks.id
+# - tag_id: References tags.id
+#
+# Delete Behavior: CASCADE - deleting a bookmark or tag removes the association.
 bookmark_tags = sa.Table(
-    """
-    Junction table connecting bookmarks to tags.
-
-    This table establishes a many-to-many relationship between bookmarks
-    and tags. A bookmark can have multiple tags, and a tag can be applied
-    to multiple bookmarks.
-
-    Primary Keys:
-    - bookmark_id: References bookmarks.id
-    - tag_id: References tags.id
-
-    Delete Behavior: CASCADE - deleting a bookmark or tag removes the association.
-    """,
+    "bookmarks_tags",
     BaseModel.metadata,
     sa.Column(
         "bookmark_id",
