@@ -2,6 +2,7 @@ from src.utils.xdk_client import xdk_client
 from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
 from src.v1.schemas.user import UserInfoFromX
+from src.v1.base.exception import ExternalAPIError
 from xdk.users.models import CreateBookmarkRequest
 import logging
 from tenacity import (
@@ -195,16 +196,16 @@ class TwitterService:
 
     # BOOKMARK METHODS
 
-    class APIError(Exception):
-        """Raised when API returns error status (429/5xx)"""
-
-        pass
-
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
         retry=retry_if_exception_type(
-            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+            (
+                httpx.ConnectError,
+                httpx.RequestError,
+                httpx.TimeoutException,
+                ExternalAPIError,
+            )
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         after=after_log(logger, logging.ERROR),
@@ -276,7 +277,9 @@ class TwitterService:
                 if response_data.get("errors") or response_data.get("title"):
                     status = response_data.get("status", 0)
                     if status in (429, 500, 502, 503, 504):
-                        raise APIError(f"API error: {response_data}")
+                        raise ExternalAPIError(
+                            f"API error: {response_data}", status_code=status
+                        )
 
             if first_page:
                 logger.info(f"Successfully fetched bookmarks for user: {user_id}")
@@ -295,7 +298,12 @@ class TwitterService:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
         retry=retry_if_exception_type(
-            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+            (
+                httpx.ConnectError,
+                httpx.RequestError,
+                httpx.TimeoutException,
+                ExternalAPIError,
+            )
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         after=after_log(logger, logging.ERROR),
@@ -328,7 +336,9 @@ class TwitterService:
                 if response_data.get("errors") or response_data.get("title"):
                     status = response_data.get("status", 0)
                     if status in (429, 500, 502, 503, 504):
-                        raise APIError(f"API error: {response_data}")
+                        raise ExternalAPIError(
+                            f"API error: {response_data}", status_code=status
+                        )
 
             logger.info(f"Bookmark creation response: {response}")
             return response_data
@@ -344,7 +354,12 @@ class TwitterService:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=60) + wait_random(0, 1),
         retry=retry_if_exception_type(
-            (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException, APIError)
+            (
+                httpx.ConnectError,
+                httpx.RequestError,
+                httpx.TimeoutException,
+                ExternalAPIError,
+            )
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         after=after_log(logger, logging.ERROR),
@@ -375,7 +390,9 @@ class TwitterService:
                 if response_data.get("errors") or response_data.get("title"):
                     status = response_data.get("status", 0)
                     if status in (429, 500, 502, 503, 504):
-                        raise APIError(f"API error: {response_data}")
+                        raise ExternalAPIError(
+                            f"API error: {response_data}", status_code=status
+                        )
 
             logger.info(f"Bookmark deletion response: {response}")
             return response_data

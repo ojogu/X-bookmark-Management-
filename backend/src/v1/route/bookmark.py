@@ -3,12 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.db import get_session
 from src.utils.log import get_logger
 from src.v1.model.users import User
-from src.v1.service.utils import get_valid_tokens
-from src.v1.service.twitter import twitter_service
 from src.v1.service.bookmark import BookmarkService
 from src.v1.route.dependencies import get_current_user, get_bookmark_service
-from src.v1.base.exception import BadRequest, ExternalAPIError
-from pydantic import BaseModel
+from src.v1.schemas import MarkReadRequest, BookmarkFolderRequest, BookmarkTagRequest
+from src.v1.base.exception import ExternalAPIError
 from typing import Optional
 
 logger = get_logger(__name__)
@@ -16,19 +14,17 @@ logger = get_logger(__name__)
 bookmark_router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
 
-class MarkReadRequest(BaseModel):
-    is_read: bool
+def _trigger_background_sync(user_id: str):
+    """Trigger background sync task (fire-and-forget)."""
+    try:
+        from src.celery.task import front_sync_bookmark_task
+
+        front_sync_bookmark_task.delay(user_id)
+    except Exception as e:
+        logger.error(f"Failed to trigger background sync for user {user_id}: {e}")
 
 
-class BookmarkFolderRequest(BaseModel):
-    folder_id: str
-
-
-class BookmarkTagRequest(BaseModel):
-    tag_id: str
-
-
-@bookmark_router.get("")
+@bookmark_router.get("")  # empty string = "/bookmarks" (not "/bookmarks/")
 async def get_bookmarks(
     limit: int = 20,
     offset: int = 0,
@@ -44,62 +40,22 @@ async def get_bookmarks(
     db: AsyncSession = Depends(get_session),
 ):
     """
-    Get user's bookmarks.
-    - If DB has bookmarks: return from DB with pagination
-    - If DB is empty: fetch from X API, save to DB, then return
+    List user's bookmarks.
+
+    Returns immediately from DB. If DB is empty, triggers background sync
+    and returns empty - user polls or clicks refresh to get data.
     """
     user_id = current_user.id
-
     tag_ids = tags.split(",") if tags else []
 
     bookmark_count = await bookmark_service.count_user_bookmarks(db, user_id)
     logger.info(f"User {user_id} has {bookmark_count} bookmarks in DB")
 
     if bookmark_count == 0:
-        logger.info(f"DB empty for user {user_id}, fetching from X API")
+        logger.info(f"DB empty for user {user_id}, triggering background sync")
+        _trigger_background_sync(str(user_id))
 
-        tokens = await get_valid_tokens(user_id, db)
-        access_token = tokens.get("access_token")
-        x_id = current_user.x_id
-
-        if not access_token or not x_id:
-            raise BadRequest("Missing credentials for X API")
-
-        api_response = await twitter_service.get_bookmarks(
-            access_token=access_token,
-            user_id=str(user_id),
-            x_id=x_id,
-            max_results=100,
-            pagination_token=None,
-        )
-
-        if not api_response.get("data"):
-            return {
-                "data": [],
-                "includes": {"users": []},
-                "meta": {"result_count": 0},
-            }
-
-        await bookmark_service.save_bookmarks(
-            db,
-            str(user_id),
-            api_response,
-            sync_time=None,
-        )
-
-        return await bookmark_service.get_bookmarks_from_db(
-            db,
-            user_id,
-            limit=limit,
-            offset=offset,
-            search=search,
-            sort=sort,
-            tag_ids=tag_ids,
-            folder_id=folder_id,
-            unread=unread,
-        )
-
-    return await bookmark_service.get_bookmarks_from_db(
+    result = await bookmark_service.get_bookmarks_from_db(
         db,
         user_id,
         limit=limit,
@@ -110,6 +66,9 @@ async def get_bookmarks(
         folder_id=folder_id,
         unread=unread,
     )
+
+    result["meta"]["last_synced_at"] = current_user.last_front_sync_time
+    return result
 
 
 @bookmark_router.delete("/{bookmark_id}")
@@ -123,6 +82,10 @@ async def delete_bookmark(
     Delete a bookmark from both SaveStack DB and X API.
     X API is source of truth - if X API fails, abort and keep local record.
     """
+    from src.v1.service.utils import get_valid_tokens
+    from src.v1.service.twitter import twitter_service
+    from src.v1.base.exception import BadRequest
+
     user_id = current_user.id
     x_id = current_user.x_id
     logger.info(f"Deleting bookmark {bookmark_id} for user {user_id}")
@@ -141,7 +104,6 @@ async def delete_bookmark(
             tweet_id=bookmark_id,
         )
         logger.info(f"Successfully deleted bookmark {bookmark_id} from X API")
-    #TODO: don't delete from X in the req-res cycle, move to queue
     except Exception as e:
         logger.error(f"Failed to delete bookmark {bookmark_id} from X API: {e}")
         raise ExternalAPIError(

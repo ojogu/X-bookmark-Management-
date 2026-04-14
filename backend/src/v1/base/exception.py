@@ -59,5 +59,17 @@ class NotActive(BaseExceptionClass):
     pass
 
 
-class ExternalAPIError(BaseExceptionClass):
-    pass
+class ExternalAPIError(Exception):
+    """Raised when external API returns an error status"""
+
+    def __init__(self, message: str, status_code: int = None):
+        self.status_code = status_code
+        super().__init__(message)
+
+    @property
+    def is_rate_limited(self) -> bool:
+        return self.status_code == 429
+
+    @property
+    def is_server_error(self) -> bool:
+        return self.status_code and 500 <= self.status_code < 600
