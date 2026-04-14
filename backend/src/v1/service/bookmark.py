@@ -27,7 +27,6 @@ from src.v1.model import (
     bookmark_tags,
 )
 
-# from src.v1.service.twitter import twitter_service
 from src.v1.base.exception import (
     Environment_Variable_Exception,
     InUseError,
@@ -153,7 +152,6 @@ class BookmarkService:
             f"search={search}, sort={sort}, tag_ids={tag_ids}, folder_id={folder_id}, unread={unread}"
         )
 
-        # Build query with filters
         query = (
             sa.select(BookmarkModel, PostModel, AuthorModel)
             .join(PostModel, BookmarkModel.post_id == PostModel.id)
@@ -161,7 +159,6 @@ class BookmarkService:
             .where(BookmarkModel.user_id == user_id)
         )
 
-        # Apply search filter (post text or author name)
         if search:
             search_pattern = f"%{search}%"
             query = query.where(
@@ -172,11 +169,9 @@ class BookmarkService:
                 )
             )
 
-        # Apply unread filter
         if unread is True:
             query = query.where(BookmarkModel.is_read == False)
 
-        # Apply folder filter
         if folder_id:
             folder_uuid = UUID(folder_id)
             query = query.join(
@@ -184,17 +179,15 @@ class BookmarkService:
                 BookmarkModel.post_id == bookmark_folders.c.bookmark_id,
             ).where(bookmark_folders.c.folder_id == folder_uuid)
 
-        # Apply sorting
         if sort == "date-asc":
             query = query.order_by(PostModel.created_at_from_twitter.asc())
         elif sort == "alpha-asc":
             query = query.order_by(PostModel.text.asc())
         elif sort == "alpha-desc":
             query = query.order_by(PostModel.text.desc())
-        else:  # date-desc (default)
+        else:
             query = query.order_by(PostModel.created_at_from_twitter.desc())
 
-        # Apply pagination
         query = query.limit(limit).offset(offset)
 
         result = await db.execute(query)
@@ -240,7 +233,6 @@ class BookmarkService:
                 }
             )
 
-        # Get total count (without pagination limits for accurate count)
         count_query = sa.select(sa.func.count(BookmarkModel.user_id)).where(
             BookmarkModel.user_id == user_id
         )
@@ -299,14 +291,12 @@ class BookmarkService:
         """
         logger.info(f"Starting bookmark save pipeline for user_id={user_id}")
 
-        # Check if user exists
         logger.debug(f"Checking if user {user_id} exists")
         user = await self.user_service.check_if_user_exists_user_id(user_id)
         if not user:
             logger.error(f"User {user_id} not found")
             raise NotFoundError(f"user: {user_id} does not exists")
 
-        # Parse & validate API response using Pydantic
         logger.debug(f"Parsing API response for user {user_id}")
         validated_response = BookmarkService.parse_bookmarks_response(
             api_response, user_id
@@ -315,7 +305,6 @@ class BookmarkService:
             f"Found {len(validated_response.bookmarks)} bookmarks to process for user {user_id}"
         )
 
-        # Iterate through bookmarks and upsert data
         for index, bm in enumerate(validated_response.bookmarks, 1):
             logger.debug(
                 f"Processing bookmark {index}/{len(validated_response.bookmarks)}"
@@ -331,7 +320,6 @@ class BookmarkService:
                 else bm.model_dump().get("author")
             )
 
-            # ---- Handle Author ----
             logger.debug(f"Checking author {author_data['id']}")
             author = await self.check_if_author_exists(db, author_data["id"])
             if not author:
@@ -345,7 +333,6 @@ class BookmarkService:
                 db.add(author)
                 await db.flush()
 
-            # ---- Handle Post ----
             logger.debug(f"Checking post {post_data['id']}")
             post = await self.check_if_post_exists(db, post_data["id"])
             if not post:
@@ -361,7 +348,6 @@ class BookmarkService:
                 db.add(post)
                 await db.flush()
 
-            # ---- Handle Bookmark ----
             logger.debug(
                 f"Checking if bookmark exists for post {post.id} and user {user_id}"
             )
@@ -374,15 +360,11 @@ class BookmarkService:
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
-                    front_sync_token=next_token
-                    if sync_time
-                    else None,  # Use front_sync_token for front sync operations
-                    next_token=next_token
-                    or "",  # Set default empty string for front sync, actual token for backfill
+                    front_sync_token=next_token if sync_time else None,
+                    next_token=next_token or "",
                 )
                 db.add(bookmark)
 
-        # Update user's last sync time if provided
         if sync_time:
             logger.debug(
                 f"Updating last_front_sync_time for user {user_id} to {sync_time}"
@@ -393,7 +375,6 @@ class BookmarkService:
                 .values(last_front_sync_time=sync_time)
             )
 
-        # Commit all changes
         try:
             await db.commit()
             logger.info(
@@ -505,7 +486,6 @@ class BookmarkService:
         """
         logger.info(f"Deleting bookmark for user_id={user_id}, tweet_id={tweet_id}")
 
-        # First, find the post by tweet_id
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -515,7 +495,6 @@ class BookmarkService:
             logger.warning(f"Post not found for tweet_id={tweet_id}")
             return False
 
-        # Now delete the bookmark using composite key
         user_uuid = UUID(user_id)
         result = await db.execute(
             sa.delete(BookmarkModel).where(
@@ -536,381 +515,6 @@ class BookmarkService:
             )
             return False
 
-    # --------------------------------------------------------------
-    # Folder methods
-    # --------------------------------------------------------------
-    async def get_folders(
-        self, db: AsyncSession, user_id: UUID
-    ) -> List[Dict[str, Any]]:
-        """
-        Get all folders for a user with bookmark count.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-
-        Returns:
-            List of folder objects with bookmark count
-        """
-        logger.info(f"Fetching folders for user_id={user_id}")
-
-        # Get folders with bookmark counts
-        result = await db.execute(
-            sa.select(FolderModel).where(FolderModel.user_id == user_id)
-        )
-        folders = result.scalars().all()
-
-        folder_list = []
-        for folder in folders:
-            # Count bookmarks in this folder
-            count_result = await db.execute(
-                sa.select(sa.func.count(bookmark_folders.c.bookmark_id)).where(
-                    bookmark_folders.c.folder_id == folder.id
-                )
-            )
-            bookmark_count = count_result.scalar() or 0
-
-            folder_list.append(
-                {
-                    "id": str(folder.id),
-                    "name": folder.name,
-                    "bookmarkCount": bookmark_count,
-                }
-            )
-
-        logger.info(f"Found {len(folder_list)} folders for user_id={user_id}")
-        return folder_list
-
-    async def create_folder(
-        self, db: AsyncSession, user_id: UUID, name: str
-    ) -> Dict[str, Any]:
-        """
-        Create a new folder for a user.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            name: Folder name
-
-        Returns:
-            Created folder object
-        """
-        logger.info(f"Creating folder '{name}' for user_id={user_id}")
-
-        # Check if folder with same name already exists
-        result = await db.execute(
-            sa.select(FolderModel).where(
-                FolderModel.user_id == user_id, FolderModel.name == name
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise AlreadyExistsError(f"Folder '{name}' already exists")
-
-        # Create new folder
-        folder = FolderModel(user_id=user_id, name=name)
-        db.add(folder)
-        await db.flush()
-        await db.refresh(folder)
-
-        logger.info(f"Created folder '{name}' with id={folder.id}")
-        return {
-            "id": str(folder.id),
-            "name": folder.name,
-            "bookmarkCount": 0,
-        }
-
-    async def update_folder(
-        self, db: AsyncSession, user_id: UUID, folder_id: UUID, name: str
-    ) -> Dict[str, Any]:
-        """
-        Rename a folder.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            folder_id: The folder's ID
-            name: New folder name
-
-        Returns:
-            Updated folder object
-        """
-        logger.info(f"Updating folder {folder_id} for user_id={user_id}")
-
-        # Find folder
-        result = await db.execute(
-            sa.select(FolderModel).where(
-                FolderModel.id == folder_id, FolderModel.user_id == user_id
-            )
-        )
-        folder = result.scalar_one_or_none()
-        if not folder:
-            raise NotFoundError(f"Folder not found")
-
-        # Check if new name already exists
-        result = await db.execute(
-            sa.select(FolderModel).where(
-                FolderModel.user_id == user_id,
-                FolderModel.name == name,
-                FolderModel.id != folder_id,
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise AlreadyExistsError(f"Folder '{name}' already exists")
-
-        # Update name
-        folder.name = name
-        await db.flush()
-        await db.refresh(folder)
-
-        # Get bookmark count
-        count_result = await db.execute(
-            sa.select(sa.func.count(bookmark_folders.c.bookmark_id)).where(
-                bookmark_folders.c.folder_id == folder.id
-            )
-        )
-        bookmark_count = count_result.scalar() or 0
-
-        logger.info(f"Updated folder {folder_id} to name '{name}'")
-        return {
-            "id": str(folder.id),
-            "name": folder.name,
-            "bookmarkCount": bookmark_count,
-        }
-
-    async def delete_folder(
-        self, db: AsyncSession, user_id: UUID, folder_id: UUID
-    ) -> bool:
-        """
-        Delete a folder.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            folder_id: The folder's ID
-
-        Returns:
-            True if deleted
-        """
-        logger.info(f"Deleting folder {folder_id} for user_id={user_id}")
-
-        # Find folder
-        result = await db.execute(
-            sa.select(FolderModel).where(
-                FolderModel.id == folder_id, FolderModel.user_id == user_id
-            )
-        )
-        folder = result.scalar_one_or_none()
-        if not folder:
-            raise NotFoundError(f"Folder not found")
-
-        # Delete folder (cascade will handle bookmark_folders)
-        await db.delete(folder)
-        await db.commit()
-
-        logger.info(f"Deleted folder {folder_id}")
-        return True
-
-    # --------------------------------------------------------------
-    # Tag methods
-    # --------------------------------------------------------------
-    async def get_tags(self, db: AsyncSession, user_id: UUID) -> List[Dict[str, Any]]:
-        """
-        Get all tags for a user with bookmark count.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-
-        Returns:
-            List of tag objects with bookmark count
-        """
-        logger.info(f"Fetching tags for user_id={user_id}")
-
-        # Get all tags
-        result = await db.execute(
-            sa.select(TagModel).where(TagModel.user_id == user_id)
-        )
-        tags = result.scalars().all()
-
-        tag_list = []
-        for tag in tags:
-            # Count bookmarks with this tag
-            count_result = await db.execute(
-                sa.select(sa.func.count(bookmark_tags.c.bookmark_id)).where(
-                    bookmark_tags.c.tag_id == tag.id
-                )
-            )
-            bookmark_count = count_result.scalar() or 0
-
-            tag_list.append(
-                {
-                    "id": str(tag.id),
-                    "name": tag.name,
-                    "color": tag.color,
-                    "source": tag.source,
-                    "bookmarkCount": bookmark_count,
-                }
-            )
-
-        logger.info(f"Found {len(tag_list)} tags for user_id={user_id}")
-        return tag_list
-
-    async def create_tag(
-        self, db: AsyncSession, user_id: UUID, name: str, color: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Create a new tag for a user.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            name: Tag name
-            color: Optional color hex code
-
-        Returns:
-            Created tag object
-        """
-        logger.info(f"Creating tag '{name}' for user_id={user_id}")
-
-        # Check if tag with same name already exists
-        result = await db.execute(
-            sa.select(TagModel).where(
-                TagModel.user_id == user_id, TagModel.name == name
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise AlreadyExistsError(f"Tag '{name}' already exists")
-
-        # Create new tag
-        tag = TagModel(user_id=user_id, name=name, color=color, source="user")
-        db.add(tag)
-        await db.flush()
-        await db.refresh(tag)
-
-        logger.info(f"Created tag '{name}' with id={tag.id}")
-        return {
-            "id": str(tag.id),
-            "name": tag.name,
-            "color": tag.color,
-            "source": tag.source,
-            "bookmarkCount": 0,
-        }
-
-    async def update_tag(
-        self,
-        db: AsyncSession,
-        user_id: UUID,
-        tag_id: UUID,
-        name: str,
-        color: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Update a tag (name and/or color).
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            tag_id: The tag's ID
-            name: New tag name
-            color: Optional new color
-
-        Returns:
-            Updated tag object
-        """
-        logger.info(f"Updating tag {tag_id} for user_id={user_id}")
-
-        # Find tag
-        result = await db.execute(
-            sa.select(TagModel).where(
-                TagModel.id == tag_id, TagModel.user_id == user_id
-            )
-        )
-        tag = result.scalar_one_or_none()
-        if not tag:
-            raise NotFoundError(f"Tag not found")
-
-        # Only user-created tags can be edited
-        if tag.source != "user":
-            raise BadRequest("Cannot edit X annotation tags")
-
-        # Check if new name already exists
-        if name and name != tag.name:
-            result = await db.execute(
-                sa.select(TagModel).where(
-                    TagModel.user_id == user_id,
-                    TagModel.name == name,
-                    TagModel.id != tag_id,
-                )
-            )
-            existing = result.scalar_one_or_none()
-            if existing:
-                raise AlreadyExistsError(f"Tag '{name}' already exists")
-            tag.name = name
-
-        if color is not None:
-            tag.color = color
-
-        await db.flush()
-        await db.refresh(tag)
-
-        # Get bookmark count
-        count_result = await db.execute(
-            sa.select(sa.func.count(bookmark_tags.c.bookmark_id)).where(
-                bookmark_tags.c.tag_id == tag.id
-            )
-        )
-        bookmark_count = count_result.scalar() or 0
-
-        logger.info(f"Updated tag {tag_id}")
-        return {
-            "id": str(tag.id),
-            "name": tag.name,
-            "color": tag.color,
-            "source": tag.source,
-            "bookmarkCount": bookmark_count,
-        }
-
-    async def delete_tag(self, db: AsyncSession, user_id: UUID, tag_id: UUID) -> bool:
-        """
-        Delete a tag.
-
-        Args:
-            db: SQLAlchemy session
-            user_id: The user's ID
-            tag_id: The tag's ID
-
-        Returns:
-            True if deleted
-        """
-        logger.info(f"Deleting tag {tag_id} for user_id={user_id}")
-
-        # Find tag
-        result = await db.execute(
-            sa.select(TagModel).where(
-                TagModel.id == tag_id, TagModel.user_id == user_id
-            )
-        )
-        tag = result.scalar_one_or_none()
-        if not tag:
-            raise NotFoundError(f"Tag not found")
-
-        # Only user-created tags can be deleted
-        if tag.source != "user":
-            raise BadRequest("Cannot delete X annotation tags")
-
-        # Delete tag (cascade will handle bookmark_tags)
-        await db.delete(tag)
-        await db.commit()
-
-        logger.info(f"Deleted tag {tag_id}")
-        return True
-
-    # --------------------------------------------------------------
-    # Mark as read methods
-    # --------------------------------------------------------------
     async def mark_as_read(
         self, db: AsyncSession, user_id: UUID, tweet_id: str
     ) -> bool:
@@ -927,7 +531,6 @@ class BookmarkService:
         """
         logger.info(f"Marking as read for user_id={user_id}, tweet_id={tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -937,7 +540,6 @@ class BookmarkService:
             logger.warning(f"Post not found for tweet_id={tweet_id}")
             return False
 
-        # Update bookmark is_read
         result = await db.execute(
             sa.update(BookmarkModel)
             .where(BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id)
@@ -971,7 +573,6 @@ class BookmarkService:
         """
         logger.info(f"Marking as unread for user_id={user_id}, tweet_id={tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -981,7 +582,6 @@ class BookmarkService:
             logger.warning(f"Post not found for tweet_id={tweet_id}")
             return False
 
-        # Update bookmark is_read
         result = await db.execute(
             sa.update(BookmarkModel)
             .where(BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id)
@@ -999,9 +599,6 @@ class BookmarkService:
             )
             return False
 
-    # --------------------------------------------------------------
-    # Bookmark folder methods
-    # --------------------------------------------------------------
     async def add_bookmark_to_folder(
         self, db: AsyncSession, user_id: UUID, tweet_id: str, folder_id: UUID
     ) -> bool:
@@ -1019,7 +616,6 @@ class BookmarkService:
         """
         logger.info(f"Adding bookmark {tweet_id} to folder {folder_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1028,7 +624,6 @@ class BookmarkService:
         if not post:
             raise NotFoundError(f"Post not found")
 
-        # Find the bookmark
         result = await db.execute(
             sa.select(BookmarkModel).where(
                 BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
@@ -1039,7 +634,6 @@ class BookmarkService:
         if not bookmark:
             raise NotFoundError(f"Bookmark not found")
 
-        # Check if already in folder
         result = await db.execute(
             sa.select(bookmark_folders).where(
                 bookmark_folders.c.bookmark_id == bookmark.post_id,
@@ -1052,7 +646,6 @@ class BookmarkService:
             logger.info(f"Bookmark already in folder")
             return True
 
-        # Add to folder
         await db.execute(
             bookmark_folders.insert().values(
                 bookmark_id=bookmark.post_id, folder_id=folder_id
@@ -1080,7 +673,6 @@ class BookmarkService:
         """
         logger.info(f"Removing bookmark {tweet_id} from folder {folder_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1089,7 +681,6 @@ class BookmarkService:
         if not post:
             raise NotFoundError(f"Post not found")
 
-        # Remove from folder
         await db.execute(
             bookmark_folders.delete().where(
                 bookmark_folders.c.bookmark_id == post.id,
@@ -1117,7 +708,6 @@ class BookmarkService:
         """
         logger.info(f"Getting folders for bookmark {tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1126,7 +716,6 @@ class BookmarkService:
         if not post:
             return []
 
-        # Get folders containing this post
         result = await db.execute(
             sa.select(FolderModel)
             .join(bookmark_folders, FolderModel.id == bookmark_folders.c.folder_id)
@@ -1145,9 +734,6 @@ class BookmarkService:
 
         return folder_list
 
-    # --------------------------------------------------------------
-    # Bookmark tag methods
-    # --------------------------------------------------------------
     async def add_tag_to_bookmark(
         self, db: AsyncSession, user_id: UUID, tweet_id: str, tag_id: UUID
     ) -> bool:
@@ -1165,7 +751,6 @@ class BookmarkService:
         """
         logger.info(f"Adding tag {tag_id} to bookmark {tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1174,7 +759,6 @@ class BookmarkService:
         if not post:
             raise NotFoundError(f"Post not found")
 
-        # Verify tag exists and belongs to user
         result = await db.execute(
             sa.select(TagModel).where(
                 TagModel.id == tag_id, TagModel.user_id == user_id
@@ -1185,7 +769,6 @@ class BookmarkService:
         if not tag:
             raise NotFoundError(f"Tag not found")
 
-        # Check if already tagged
         result = await db.execute(
             sa.select(bookmark_tags).where(
                 bookmark_tags.c.bookmark_id == post.id, bookmark_tags.c.tag_id == tag_id
@@ -1197,7 +780,6 @@ class BookmarkService:
             logger.info(f"Bookmark already tagged")
             return True
 
-        # Add tag
         await db.execute(
             bookmark_tags.insert().values(bookmark_id=post.id, tag_id=tag_id)
         )
@@ -1223,7 +805,6 @@ class BookmarkService:
         """
         logger.info(f"Removing tag {tag_id} from bookmark {tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1232,7 +813,6 @@ class BookmarkService:
         if not post:
             raise NotFoundError(f"Post not found")
 
-        # Verify tag belongs to user
         result = await db.execute(
             sa.select(TagModel).where(
                 TagModel.id == tag_id, TagModel.user_id == user_id
@@ -1243,7 +823,6 @@ class BookmarkService:
         if not tag:
             raise NotFoundError(f"Tag not found")
 
-        # Remove tag
         await db.execute(
             bookmark_tags.delete().where(
                 bookmark_tags.c.bookmark_id == post.id, bookmark_tags.c.tag_id == tag_id
@@ -1270,7 +849,6 @@ class BookmarkService:
         """
         logger.info(f"Getting tags for bookmark {tweet_id}")
 
-        # Find the post
         result = await db.execute(
             sa.select(PostModel).where(PostModel.post_id == tweet_id)
         )
@@ -1279,7 +857,6 @@ class BookmarkService:
         if not post:
             return []
 
-        # Get tags
         result = await db.execute(
             sa.select(TagModel)
             .join(bookmark_tags, TagModel.id == bookmark_tags.c.tag_id)

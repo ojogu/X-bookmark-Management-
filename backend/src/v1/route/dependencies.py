@@ -4,6 +4,8 @@ from src.utils.db import get_session
 from src.v1.auth.service import AccessTokenBearer
 from src.v1.service.user import UserService
 from src.v1.service.bookmark import BookmarkService
+from src.v1.service.folder import FolderService
+from src.v1.service.tag import TagService
 from src.v1.auth.twitter_auth import TwitterAuthService
 
 
@@ -30,6 +32,26 @@ def get_bookmark_service(user_service: UserService = Depends(get_user_service)):
     return BookmarkService(user_service=user_service)
 
 
+def get_folder_service():
+    """
+    Dependency function to get an instance of FolderService.
+
+    Returns:
+        FolderService: An instance of the FolderService.
+    """
+    return FolderService()
+
+
+def get_tag_service():
+    """
+    Dependency function to get an instance of TagService.
+
+    Returns:
+        TagService: An instance of the TagService.
+    """
+    return TagService()
+
+
 def get_twitter_client(user_service: UserService = Depends(get_user_service)):
     """
     Dependency function to get an instance of TwitterAuthService.
@@ -42,8 +64,10 @@ def get_twitter_client(user_service: UserService = Depends(get_user_service)):
     """
     return TwitterAuthService(user_service)
 
-async def get_current_user(user_details:dict = Depends(AccessTokenBearer()),
-user_service: UserService = Depends(get_user_service)
+
+async def get_current_user(
+    user_details: dict = Depends(AccessTokenBearer()),
+    user_service: UserService = Depends(get_user_service),
 ):
     user_id = user_details["user"]["user_id"]
     user = await user_service.check_if_user_exists_user_id(user_id)
