@@ -5,8 +5,19 @@ from sqlalchemy.orm import relationship
 
 class Tag(BaseModel):
     """
-    Tags for organizing bookmarks.
-    Tags can come from X annotations or be user-created.
+    Represents a tag for organizing bookmarks.
+
+    Tags allow users to categorize and label their bookmarks. Tags can come
+    from X annotations (e.g., community notes) or be user-created.
+
+    Relationships:
+    - One user can have many tags (backref 'tags').
+    - Each tag belongs to exactly one user.
+
+    Fields:
+    - name: The tag label (e.g., 'work', 'important').
+    - color: Optional color for visual organization.
+    - source: Origin of the tag ('x' for X annotations, 'user' for user-created).
     """
 
     __tablename__ = "tags"
@@ -23,7 +34,19 @@ class Tag(BaseModel):
 
 # Junction table for bookmark-tag many-to-many relationship
 bookmark_tags = sa.Table(
-    "bookmark_tags",
+    """
+    Junction table connecting bookmarks to tags.
+
+    This table establishes a many-to-many relationship between bookmarks
+    and tags. A bookmark can have multiple tags, and a tag can be applied
+    to multiple bookmarks.
+
+    Primary Keys:
+    - bookmark_id: References bookmarks.id
+    - tag_id: References tags.id
+
+    Delete Behavior: CASCADE - deleting a bookmark or tag removes the association.
+    """,
     BaseModel.metadata,
     sa.Column(
         "bookmark_id",

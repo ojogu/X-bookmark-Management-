@@ -43,6 +43,17 @@ class Bookmark(BaseModel):
 
 
 class Folder(BaseModel):
+    """
+    Represents a folder for organizing bookmarks within a user's account.
+
+    Folders allow users to categorize their bookmarks into custom groups.
+    Each folder belongs to exactly one user (owner).
+
+    Relationships:
+    - One user can have many folders.
+    - Each folder belongs to exactly one user.
+    """
+
     __tablename__ = "folders"
     user_id = sa.Column(
         sa.UUID, sa.ForeignKey("users.id"), primary_key=True, nullable=False
@@ -53,8 +64,21 @@ class Folder(BaseModel):
     user = relationship("User", backref="folders")
 
 
+# Junction table for bookmark-folder many-to-many relationship
 bookmark_folders = sa.Table(
-    "bookmark_folders",
+    """
+    Junction table connecting bookmarks to folders.
+
+    This table establishes a many-to-many relationship between bookmarks
+    and folders. A bookmark can belong to multiple folders, and a folder
+    can contain multiple bookmarks.
+
+    Primary Keys:
+    - bookmark_id: References bookmarks.id
+    - folder_id: References folders.id
+
+    Delete Behavior: CASCADE - deleting a bookmark or folder removes the association.
+    """,
     BaseModel.metadata,
     sa.Column(
         "bookmark_id",

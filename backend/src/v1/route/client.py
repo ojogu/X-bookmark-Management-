@@ -187,7 +187,7 @@ async def delete_bookmark(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to delete from X: {str(e)}. Local record preserved.",
         )
-
+    #TODO: handle delete from X directly in req-res cycle, move to queue
     # X API succeeded - now delete from local DB
     await bookmark_service.delete_bookmark(db, str(user_id), bookmark_id)
     logger.info(f"Successfully deleted bookmark {bookmark_id} from local DB")

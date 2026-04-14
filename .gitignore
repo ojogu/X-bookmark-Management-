@@ -180,4 +180,6 @@ coverage/
 .dynamodb/
 .tern-port
 .vscode-test/
+# Agent settings
+AGENTS.md
 .opencode

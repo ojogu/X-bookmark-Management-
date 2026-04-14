@@ -6,6 +6,19 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 
 class User(BaseModel):
+    """
+    Represents a user account in the system.
+
+    This table stores user information synced from X (Twitter), including
+    profile data and statistics. Each user has a unique x_id from the X API.
+
+    Relationships:
+    - One user can have many bookmarks (backref 'bookmarks').
+    - One user can have many folders (backref 'folders').
+    - One user can have many tags (backref 'tags').
+    - One user can have one UserToken (relationship 'token').
+    """
+
     __tablename__ = "users"
     x_id = sa.Column(sa.String, nullable=False, unique=True)
     profile_image_url = sa.Column(sa.String, nullable=False)
@@ -24,6 +37,22 @@ class User(BaseModel):
 
 
 class UserToken(BaseModel):
+    """
+    Stores OAuth tokens for a user's X API access.
+
+    This table contains the access and refresh tokens required to authenticate
+    API requests on behalf of the user. Each user can have only one token set.
+
+    Relationships:
+    - One user has one UserToken (relationship 'token').
+
+    Fields:
+    - access_token: Token for making API requests.
+    - refresh_token: Token for obtaining new access tokens when expired.
+    - expires_at: Expiration time of the access token.
+    - is_expired: Hybrid property/expression to check token validity.
+    """
+
     __tablename__ = "user_tokens"
     user_id = sa.Column(sa.UUID, sa.ForeignKey("users.id"), unique=True, nullable=False)
     access_token = sa.Column(sa.String, nullable=False)
