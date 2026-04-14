@@ -177,6 +177,9 @@ class TokenService(HTTPBearer):
         # Step 1: Extract token from Authorization header
         credentials: HTTPAuthorizationCredentials = await super().__call__(request)
 
+        if credentials is None:
+            raise InvalidToken("Missing authentication token")
+
         if not credentials or not credentials.scheme.lower() == "bearer":
             raise InvalidToken("Invalid authentication scheme")
 

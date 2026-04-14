@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { Wordmark } from '@/components/common/Wordmark'
 
 export default function Error500Page() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-bg px-4 text-center">
-      <Link to="/" className="font-serif italic text-xl text-text-primary">
-        Save<span className="text-brand-mid">Stack</span>
+      <Link to="/">
+        <Wordmark />
       </Link>
 
       <div className="flex flex-col items-center gap-4">

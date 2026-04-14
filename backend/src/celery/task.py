@@ -145,7 +145,7 @@ def front_sync_bookmark_task(self, user_id):
                     access_token=access_token,
                     user_id=user_id,
                     x_id=x_id,
-                    max_results=20,
+                    max_results=10,
                     pagination_token=front_sync_token,
                 )
 
@@ -267,7 +267,7 @@ def backfill_bookmark_task(self, user_id):
                     access_token=access_token,
                     user_id=user_id,
                     x_id=x_id,
-                    max_results=20,
+                    max_results=10,
                     pagination_token=next_token,
                 )
 

@@ -3,7 +3,8 @@
 @import "tailwindcss";
 
 /* ================================================================
-   Design Tokens — SaveStack Dark Theme
+   Design Tokens — SaveStack (Light theme as default)
+   Dark theme uses Tailwind's .dark class + dark: modifier
    ================================================================ */
 
 :root {
@@ -17,26 +18,75 @@
   --brand-light: rgba(16, 185, 129, 0.10);
   --brand-hover: #059669;
 
-  /* ── Page surfaces ──────────────────────────────────────────── */
-  --bg: #0C0C0E;
-  --bg-card: #131318;
-  --bg-subtle: #1A1A22;
+  /* ── Page surfaces (Light theme) ─────────────────────────────── */
+  --bg: #F8F9FA;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F1F3F4;
 
-  /* ── Text ───────────────────────────────────────────────────── */
-  --text-primary: #F0F0F4;
-  --text-secondary: #9090A8;
-  --text-muted: #5A5A72;
+  /* ── Text (Light theme) ──────────────────────────────────────── */
+  --text-primary: #1A1A22;
+  --text-secondary: #5A5A72;
+  --text-muted: #9090A8;
 
-  /* ── Borders ────────────────────────────────────────────────── */
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  /* ── Borders (Light theme) ───────────────────────────────────── */
+  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.14);
 
   /* ── Radius ─────────────────────────────────────────────────── */
   --radius: 8px;
 
   /* ================================================================
-     shadcn/ui semantic variables
-     Components reference these directly via var(--*)
+     shadcn/ui semantic variables (Light theme)
+     ================================================================ */
+  --background:               #F8F9FA;
+  --foreground:               #1A1A22;
+  --card:                     #FFFFFF;
+  --card-foreground:          #1A1A22;
+  --popover:                  #FFFFFF;
+  --popover-foreground:       #1A1A22;
+  --primary:                  #10B981;
+  --primary-foreground:       #ffffff;
+  --secondary:                #F1F3F4;
+  --secondary-foreground:     #1A1A22;
+  --muted:                    #F1F3F4;
+  --muted-foreground:         #5A5A72;
+  --accent:                   rgba(16, 185, 129, 0.10);
+  --accent-foreground:        #1A1A22;
+  --destructive:              #EF4444;
+  --destructive-foreground:   #ffffff;
+  --border:                   rgba(0, 0, 0, 0.07);
+  --input:                    #F1F3F4;
+  --ring:                     #34D399;
+
+  /* ── shadcn sidebar vars (Light theme) ──────────────────────── */
+  --sidebar:                        #F8F9FA;
+  --sidebar-foreground:             #1A1A22;
+  --sidebar-primary:                #10B981;
+  --sidebar-primary-foreground:     #ffffff;
+  --sidebar-accent:                 rgba(16, 185, 129, 0.10);
+  --sidebar-accent-foreground:      #34D399;
+  --sidebar-border:                 rgba(0, 0, 0, 0.07);
+  --sidebar-ring:                   #34D399;
+}
+
+/* Dark theme overrides - applied when <html class="dark"> */
+.dark {
+  /* ── Page surfaces (Dark theme) ──────────────────────────────── */
+  --bg: #0C0C0E;
+  --bg-card: #131318;
+  --bg-subtle: #1A1A22;
+
+  /* ── Text (Dark theme) ──────────────────────────────────────── */
+  --text-primary: #F0F0F4;
+  --text-secondary: #9090A8;
+  --text-muted: #5A5A72;
+
+  /* ── Borders (Dark theme) ───────────────────────────────────── */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* ================================================================
+     shadcn/ui semantic variables (Dark theme)
      ================================================================ */
   --background:               #0C0C0E;
   --foreground:               #F0F0F4;
@@ -44,29 +94,18 @@
   --card-foreground:          #F0F0F4;
   --popover:                  #1E1E28;
   --popover-foreground:       #F0F0F4;
-  --primary:                  #10B981;
-  --primary-foreground:       #ffffff;
   --secondary:                #1A1A22;
   --secondary-foreground:     #F0F0F4;
   --muted:                    #1A1A22;
   --muted-foreground:         #9090A8;
-  --accent:                   rgba(16, 185, 129, 0.10);
   --accent-foreground:        #F0F0F4;
-  --destructive:              #EF4444;
-  --destructive-foreground:   #ffffff;
   --border:                   rgba(255, 255, 255, 0.07);
   --input:                    #1A1A22;
-  --ring:                     #34D399;
 
-  /* ── shadcn sidebar vars ──────────────────────────────────── */
+  /* ── shadcn sidebar vars (Dark theme) ──────────────────────── */
   --sidebar:                        #0C0C0E;
   --sidebar-foreground:             #F0F0F4;
-  --sidebar-primary:                #10B981;
-  --sidebar-primary-foreground:     #ffffff;
-  --sidebar-accent:                 rgba(16, 185, 129, 0.10);
-  --sidebar-accent-foreground:      #34D399;
   --sidebar-border:                 rgba(255, 255, 255, 0.07);
-  --sidebar-ring:                   #34D399;
 }
 
 /* ── Map CSS vars → Tailwind utility classes ─────────────────── */
@@ -122,6 +161,12 @@
   --color-sidebar-border:               var(--sidebar-border);
   --color-sidebar-ring:                 var(--sidebar-ring);
 }
+
+/* ── Theme-aware Wordmark visibility ─────────────────────────── */
+.dark .wordmark-dark { display: block; }
+.dark .wordmark-light { display: none; }
+html:not(.dark) .wordmark-dark { display: none; }
+html:not(.dark) .wordmark-light { display: block; }
 
 /* ── Typography utilities ────────────────────────────────────── */
 @utility text-display {

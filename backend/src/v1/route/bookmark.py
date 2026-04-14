@@ -26,7 +26,7 @@ def _trigger_background_sync(user_id: str):
 
 @bookmark_router.get("")  # empty string = "/bookmarks" (not "/bookmarks/")
 async def get_bookmarks(
-    limit: int = 20,
+    limit: int = 10,
     offset: int = 0,
     search: Optional[str] = Query(None, description="Full-text search"),
     sort: Optional[str] = Query(

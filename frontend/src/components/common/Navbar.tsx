@@ -8,6 +8,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useAuth } from '@/hooks/useAuth'
+import { Wordmark } from '@/components/common/Wordmark'
 
 const navLinks = ['Features', 'Pricing', 'Blog']
 
@@ -27,8 +28,8 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-border-subtle bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link to="/" className="font-serif italic text-xl text-text-primary">
-          Save<span className="text-brand-mid">Stack</span>
+        <Link to="/">
+          <Wordmark />
         </Link>
 
         {/* Desktop nav */}
@@ -72,9 +73,9 @@ export default function Navbar() {
           <div className="flex h-full flex-col">
             {/* Sheet header */}
             <div className="flex items-center justify-between border-b border-border-subtle px-6 py-5">
-              <span className="font-serif italic text-xl text-text-primary">
-                Save<span className="text-brand-mid">Stack</span>
-              </span>
+              <Link to="/" onClick={() => setMobileOpen(false)}>
+                <Wordmark />
+              </Link>
               <button
                 onClick={() => setMobileOpen(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:text-text-primary"

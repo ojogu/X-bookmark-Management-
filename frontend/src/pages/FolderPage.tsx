@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import BookmarkFeed from '@/components/bookmarks/BookmarkFeed'
@@ -16,6 +16,7 @@ import {
 
 export default function FolderPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, isFetching } = useFolderBookmarks(id ?? '', page)
@@ -78,6 +79,7 @@ export default function FolderPage() {
           deletingId={deletingId}
           emptyMessage="This folder is empty"
           emptyDescription="Move bookmarks here to organize them."
+          onAddBookmark={() => navigate('/dashboard')}
         />
 
         {hasMore && (

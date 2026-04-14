@@ -1,4 +1,5 @@
 import { Search, Bookmark, BookmarkCheck, Folder, Tag } from 'lucide-react'
+import { Wordmark } from '@/components/common/Wordmark'
 
 const sampleBookmarks = [
   {
@@ -61,9 +62,7 @@ export default function AppMockup() {
             <aside className="hidden w-52 shrink-0 flex-col border-r border-border-subtle md:flex">
               {/* Logo */}
               <div className="border-b border-border-subtle px-4 py-3">
-                <span className="font-serif italic text-base text-text-primary">
-                  Save<span className="text-brand-mid">Stack</span>
-                </span>
+                <Wordmark />
               </div>
 
               {/* User */}

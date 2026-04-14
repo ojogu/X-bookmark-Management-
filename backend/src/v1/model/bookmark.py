@@ -33,14 +33,6 @@ class Bookmark(BaseModel):
     # read status
     is_read = sa.Column(sa.Boolean, default=False)
 
-    # tokens for sync
-    front_sync_anchor = sa.Column(sa.DateTime, nullable=True)
-    front_sync_token = sa.Column(sa.String, nullable=True)
-
-    # backfill
-    next_token = sa.Column(sa.String, nullable=False, default="")
-    is_backfill_complete = sa.Column(sa.Boolean, default=False)
-
 
 class Folder(BaseModel):
     """

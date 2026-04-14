@@ -47,7 +47,7 @@ export default function BookmarkCard({
 
   return (
     <article
-      className={`group relative rounded-xl border bg-bg-card p-4 transition-colors hover:border-border-strong ${
+      className={`group relative rounded-xl border bg-card p-4 transition-colors hover:border-border-strong dark:bg-bg-card dark:border-border-subtle dark:hover:border-border-strong ${
         isRead ? 'border-border-subtle' : 'border-border-strong'
       } ${isDeleting ? 'pointer-events-none opacity-50' : ''}`}
     >
@@ -60,26 +60,26 @@ export default function BookmarkCard({
       <div className="mb-3 flex items-center gap-2 pl-4">
         <Avatar className="h-6 w-6 shrink-0">
           <AvatarImage src={author.avatarUrl ?? undefined} alt={author.name} />
-          <AvatarFallback className="bg-bg-subtle text-[10px] text-text-muted">
+          <AvatarFallback className="bg-muted text-[10px] text-muted-foreground dark:bg-bg-subtle dark:text-text-muted">
             {author.name.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
-        <span className="text-sm font-medium text-text-primary">{author.name}</span>
-        <span className="text-xs text-text-muted">@{author.handle}</span>
+        <span className="text-sm font-medium text-card-foreground dark:text-text-primary">{author.name}</span>
+        <span className="text-xs text-muted-foreground dark:text-text-muted">@{author.handle}</span>
 
         {faviconUrl && (
           <>
-            <span className="text-xs text-text-muted">·</span>
+            <span className="text-xs text-muted-foreground dark:text-text-muted">·</span>
             <img src={faviconUrl} alt="" className="h-3.5 w-3.5 rounded-sm" />
           </>
         )}
 
-        <span className="ml-auto text-xs text-text-muted">{formatRelativeTime(savedAt)}</span>
+        <span className="ml-auto text-xs text-muted-foreground dark:text-text-muted">{formatRelativeTime(savedAt)}</span>
       </div>
 
       {/* Tweet text */}
-      <p className="line-clamp-4 text-sm leading-relaxed text-text-primary pl-4">{text}</p>
+      <p className="line-clamp-4 text-sm leading-relaxed text-card-foreground dark:text-text-primary pl-4">{text}</p>
 
       {/* Footer — tags + actions */}
       <div className="mt-3 flex items-center gap-1.5 pl-4">
@@ -93,14 +93,14 @@ export default function BookmarkCard({
           </Badge>
         ))}
         {tags.length > 4 && (
-          <span className="text-xs text-text-muted">+{tags.length - 4}</span>
+          <span className="text-xs text-muted-foreground dark:text-text-muted">+{tags.length - 4}</span>
         )}
 
         {/* Actions dropdown */}
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-muted opacity-0 transition-all hover:bg-bg-subtle group-hover:opacity-100"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground dark:text-text-muted transition-all hover:bg-muted dark:hover:bg-bg-subtle ml-auto"
               title="More actions"
             >
               <MoreHorizontal size={13} />

@@ -28,11 +28,15 @@ import {
   Folder,
   FolderOpen,
   LogOut,
+  Moon,
+  Sun,
   Tag,
   User,
 } from 'lucide-react'
 import { useProfile, useFolders, useUnreadBookmarks } from '@/features/bookmarks/hooks'
 import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
+import { Wordmark } from '@/components/common/Wordmark'
 
 export default function AppSidebar() {
   const location = useLocation()
@@ -40,6 +44,7 @@ export default function AppSidebar() {
   const { data: profile } = useProfile()
   const { data: folders } = useFolders()
   const { data: unread } = useUnreadBookmarks()
+  const { theme, setTheme } = useTheme()
 
   const unreadCount = unread?.data?.length ?? 0
 
@@ -49,10 +54,16 @@ export default function AppSidebar() {
   return (
     <Sidebar collapsible="offcanvas">
       {/* Logo */}
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <Link to="/" className="font-serif italic text-xl text-sidebar-foreground">
-          Save<span className="text-brand-mid">Stack</span>
+      <SidebarHeader className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
+        <Link to="/">
+          <Wordmark />
         </Link>
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground dark:text-text-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
       </SidebarHeader>
 
       <SidebarContent>
@@ -74,7 +85,7 @@ export default function AppSidebar() {
                   <p className="truncate text-sm font-medium text-sidebar-foreground">
                     {profile.name}
                   </p>
-                  <p className="truncate text-xs text-text-muted">@{profile.username}</p>
+                  <p className="truncate text-xs text-muted-foreground dark:text-text-muted">@{profile.username}</p>
                 </div>
               </NavLink>
             </div>
@@ -152,7 +163,7 @@ export default function AppSidebar() {
                           >
                             <NavLink to={`/dashboard/folders/${folder.id}`}>
                               <span className="flex-1 truncate">{folder.name}</span>
-                              <span className="text-xs text-text-muted">{folder.bookmarkCount}</span>
+                              <span className="text-xs text-muted-foreground dark:text-text-muted">{folder.bookmarkCount}</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -161,7 +172,7 @@ export default function AppSidebar() {
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
                           <NavLink to="/dashboard/folders">
-                            <span className="text-text-muted">Manage folders</span>
+                            <span className="text-muted-foreground dark:text-text-muted">Manage folders</span>
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

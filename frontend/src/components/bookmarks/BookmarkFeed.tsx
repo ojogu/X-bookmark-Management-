@@ -1,4 +1,5 @@
-import { BookmarkX } from 'lucide-react'
+import { BookmarkX, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/skeleton'
 import BookmarkCard from './BookmarkCard'
 import type { Bookmark, Folder as FolderType, Tag as TagType } from '@/types'
@@ -19,11 +20,12 @@ interface BookmarkFeedProps {
   deletingId?: string | null
   emptyMessage?: string
   emptyDescription?: string
+  onAddBookmark?: () => void
 }
 
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-border-subtle bg-bg-card p-4">
+    <div className="rounded-xl border border-border-subtle bg-card p-4 dark:bg-bg-card">
       <div className="mb-3 flex items-center gap-2">
         <Skeleton className="h-6 w-6 rounded-full" />
         <Skeleton className="h-3.5 w-28 rounded" />
@@ -57,6 +59,7 @@ export default function BookmarkFeed({
   deletingId,
   emptyMessage = 'No bookmarks found',
   emptyDescription = 'Try adjusting your search or filters.',
+  onAddBookmark,
 }: BookmarkFeedProps) {
   if (isLoading) {
     return (
@@ -74,8 +77,8 @@ export default function BookmarkFeed({
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
           <BookmarkX size={24} className="text-destructive" />
         </div>
-        <p className="text-sm font-medium text-text-primary">Something went wrong</p>
-        <p className="mt-1 text-xs text-text-muted">Failed to load bookmarks. Please try again.</p>
+        <p className="text-sm font-medium text-card-foreground dark:text-text-primary">Something went wrong</p>
+        <p className="mt-1 text-xs text-muted-foreground dark:text-text-muted">Failed to load bookmarks. Please try again.</p>
       </div>
     )
   }
@@ -83,11 +86,29 @@ export default function BookmarkFeed({
   if (!bookmarks || bookmarks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-bg-subtle">
-          <BookmarkX size={24} className="text-text-muted" />
-        </div>
-        <p className="text-sm font-medium text-text-primary">{emptyMessage}</p>
-        <p className="mt-1 text-xs text-text-muted">{emptyDescription}</p>
+        {onAddBookmark ? (
+          <>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted dark:bg-bg-subtle">
+              <Plus size={24} className="text-muted-foreground dark:text-text-muted" />
+            </div>
+            <p className="text-sm font-medium text-card-foreground dark:text-text-primary">{emptyMessage}</p>
+            <p className="mt-1 text-xs text-muted-foreground dark:text-text-muted">{emptyDescription}</p>
+            <Link
+              to="/dashboard"
+              className="mt-4 rounded-lg bg-muted dark:bg-bg-subtle px-4 py-2 text-sm font-medium text-card-foreground dark:text-text-primary transition-colors hover:bg-border dark:hover:bg-border-subtle"
+            >
+              Add bookmark
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted dark:bg-bg-subtle">
+              <BookmarkX size={24} className="text-muted-foreground dark:text-text-muted" />
+            </div>
+            <p className="text-sm font-medium text-card-foreground dark:text-text-primary">{emptyMessage}</p>
+            <p className="mt-1 text-xs text-muted-foreground dark:text-text-muted">{emptyDescription}</p>
+          </>
+        )}
       </div>
     )
   }

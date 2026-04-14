@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Wordmark } from '@/components/common/Wordmark'
 
 const productLinks = ['Features', 'Pricing', 'Blog']
 const legalLinks = ['Privacy', 'Terms', 'Support']
@@ -10,8 +11,8 @@ export default function Footer() {
         <div className="flex flex-col gap-10 md:flex-row md:justify-between">
           {/* Brand */}
           <div>
-            <Link to="/" className="font-serif italic text-xl text-text-primary">
-              Save<span className="text-brand-mid">Stack</span>
+            <Link to="/">
+              <Wordmark />
             </Link>
             <p className="mt-1.5 text-sm text-text-muted">Your bookmarks, organized.</p>
             <p className="mt-6 text-xs text-text-muted">

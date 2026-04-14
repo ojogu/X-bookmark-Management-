@@ -47,14 +47,54 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
       if (filter.folderId) params.set('folder_id', filter.folderId)
 
       const res = await client.get<{
-        data: Bookmark[]
+        data: Array<{
+          id: string
+          text: string
+          author_id: string
+          created_at: string
+          lang: string
+          possibly_sensitive: boolean
+        }>
+        includes: {
+          users: Array<{
+            id: string
+            username: string
+            name: string
+            profile_image_url: string
+          }>
+        }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?${params}`)
       
-      // Transform backend response to frontend format
       const response = res.data
+
+      // Transform backend response to frontend format
+      const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
+      
+      const transformedData: Bookmark[] = response.data.map(bookmark => {
+        const author = usersMap.get(bookmark.author_id)
+        return {
+          id: bookmark.id,
+          tweetId: bookmark.id,
+          text: bookmark.text,
+          author: {
+            id: author?.id || bookmark.author_id,
+            name: author?.name || 'Unknown',
+            handle: author?.username || 'unknown',
+            avatarUrl: author?.profile_image_url || null,
+            verified: false,
+          },
+          savedAt: bookmark.created_at,
+          isRead: false,
+          tags: [],
+          folder: null,
+          url: `https://x.com/i/bookmarks/${bookmark.id}`,
+          faviconUrl: undefined,
+        }
+      })
+
       return {
-        data: response.data,
+        data: transformedData,
         pagination: {
           page,
           pageSize: limit,
@@ -74,13 +114,54 @@ export function useUnreadBookmarks(page: number = 0) {
       const limit = 20
       const offset = page * limit
       const res = await client.get<{
-        data: Bookmark[]
+        data: Array<{
+          id: string
+          text: string
+          author_id: string
+          created_at: string
+          lang: string
+          possibly_sensitive: boolean
+        }>
+        includes: {
+          users: Array<{
+            id: string
+            username: string
+            name: string
+            profile_image_url: string
+          }>
+        }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?unread=true&limit=${limit}&offset=${offset}`)
       
       const response = res.data
+
+      // Transform backend response to frontend format
+      const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
+      
+      const transformedData: Bookmark[] = response.data.map(bookmark => {
+        const author = usersMap.get(bookmark.author_id)
+        return {
+          id: bookmark.id,
+          tweetId: bookmark.id,
+          text: bookmark.text,
+          author: {
+            id: author?.id || bookmark.author_id,
+            name: author?.name || 'Unknown',
+            handle: author?.username || 'unknown',
+            avatarUrl: author?.profile_image_url || null,
+            verified: false,
+          },
+          savedAt: bookmark.created_at,
+          isRead: false,
+          tags: [],
+          folder: null,
+          url: `https://x.com/i/bookmarks/${bookmark.id}`,
+          faviconUrl: undefined,
+        }
+      })
+
       return {
-        data: response.data,
+        data: transformedData,
         pagination: {
           page,
           pageSize: limit,
@@ -181,13 +262,54 @@ export function useFolderBookmarks(folderId: string, page: number = 0) {
       const limit = 20
       const offset = page * limit
       const res = await client.get<{
-        data: Bookmark[]
+        data: Array<{
+          id: string
+          text: string
+          author_id: string
+          created_at: string
+          lang: string
+          possibly_sensitive: boolean
+        }>
+        includes: {
+          users: Array<{
+            id: string
+            username: string
+            name: string
+            profile_image_url: string
+          }>
+        }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?folder_id=${folderId}&limit=${limit}&offset=${offset}`)
 
       const response = res.data
+
+      // Transform backend response to frontend format
+      const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
+      
+      const transformedData: Bookmark[] = response.data.map(bookmark => {
+        const author = usersMap.get(bookmark.author_id)
+        return {
+          id: bookmark.id,
+          tweetId: bookmark.id,
+          text: bookmark.text,
+          author: {
+            id: author?.id || bookmark.author_id,
+            name: author?.name || 'Unknown',
+            handle: author?.username || 'unknown',
+            avatarUrl: author?.profile_image_url || null,
+            verified: false,
+          },
+          savedAt: bookmark.created_at,
+          isRead: false,
+          tags: [],
+          folder: null,
+          url: `https://x.com/i/bookmarks/${bookmark.id}`,
+          faviconUrl: undefined,
+        }
+      })
+
       return {
-        data: response.data,
+        data: transformedData,
         pagination: {
           page,
           pageSize: limit,

@@ -33,7 +33,7 @@ async def life_span(app: FastAPI):
     configure_structlog()
 
     print(f"dropping db....")
-    await drop_db() 
+    # await drop_db() 
     print(f"db dropped")
 
     # Startup: Initialize the database

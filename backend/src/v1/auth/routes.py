@@ -128,7 +128,7 @@ async def logout(token_details: dict = Depends(RefreshTokenBearer())):
         if await key_exist(key=str(jti)):
             raise InvalidToken("Refresh token has been revoked")
 
-        await set_cache(key=str(jti), data="")
+        await set_cache(key=str(jti), data="", ttl=config.refresh_token_expiry)
         logger.info(f"User logged out, token {jti} has been revoked")
 
         return success_response(
@@ -157,7 +157,7 @@ async def get_new_tokens_token(token_details: dict = Depends(RefreshTokenBearer(
         )
 
         # Blacklist the old refresh token
-        await set_cache(key=str(jti), data="")
+        await set_cache(key=str(jti), data="", ttl=config.refresh_token_expiry)
         logger.info(f"{jti} has been revoked")
         tokens = {"access_token": access_token, "refresh_token": refresh_token}
 

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { authStore } from '@/store/auth'
 import { useFetchUserInfoFresh, useTriggerSync } from '@/features/bookmarks/hooks'
+import { Wordmark } from '@/components/common/Wordmark'
 
 type OnboardingStep = 'connecting' | 'fetching_profile' | 'syncing_bookmarks' | 'done'
 type Status = 'onboarding' | 'success' | 'error'
@@ -67,8 +67,8 @@ export default function CallbackPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-bg px-4">
-      <Link to="/" className="font-serif italic text-2xl text-text-primary">
-        Save<span className="text-brand-mid">Stack</span>
+      <Link to="/">
+        <Wordmark />
       </Link>
 
       {status === 'onboarding' && (

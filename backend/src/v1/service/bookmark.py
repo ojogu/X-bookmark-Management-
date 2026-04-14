@@ -80,23 +80,19 @@ class BookmarkService:
 
     async def fetch_next_token(self, db: AsyncSession, user_id):
         """Fetch the next_token for backfill pagination."""
-        next_token = await db.execute(
-            sa.select(BookmarkModel.next_token).where(user_id == BookmarkModel.user_id)
-        )
-        if not next_token:
+        result = await db.execute(sa.select(User.next_token).where(User.id == user_id))
+        if not result:
             return None
-        return next_token.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
     async def fetch_front_sync_token(self, db: AsyncSession, user_id):
         """Fetch the front_sync_token for front sync pagination."""
-        front_sync_token = await db.execute(
-            sa.select(BookmarkModel.front_sync_token).where(
-                user_id == BookmarkModel.user_id
-            )
+        result = await db.execute(
+            sa.select(User.front_sync_token).where(User.id == user_id)
         )
-        if not front_sync_token:
+        if not result:
             return None
-        return front_sync_token.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
     async def get_last_sync_time(self, db: AsyncSession, user_id):
         """Get the last successful front sync timestamp for a user."""
@@ -117,6 +113,18 @@ class BookmarkService:
             .values(last_front_sync_time=sync_time)
         )
         await db.commit()
+
+    async def update_front_sync_token(self, db: AsyncSession, user_id, token: str):
+        """Update the front_sync_token for front sync pagination."""
+        await db.execute(
+            sa.update(User).where(User.id == user_id).values(front_sync_token=token)
+        )
+
+    async def update_next_token(self, db: AsyncSession, user_id, token: str):
+        """Update the next_token for backfill pagination."""
+        await db.execute(
+            sa.update(User).where(User.id == user_id).values(next_token=token)
+        )
 
     async def mark_backfill_complete(self, db: AsyncSession, user_id):
         """Mark backfill as complete for a user."""
@@ -139,7 +147,7 @@ class BookmarkService:
         self,
         db: AsyncSession,
         user_id: UUID,
-        limit: int = 20,
+        limit: int = 10,
         offset: int = 0,
         search: Optional[str] = None,
         sort: str = "date-desc",
@@ -379,22 +387,19 @@ class BookmarkService:
                     user_id=user_id,
                     post_id=post.id,
                 )
-                if sync_time:
-                    bookmark.front_sync_token = next_token
-                else:
-                    bookmark.next_token = next_token or ""
                 db.add(bookmark)
-            else:
-                if sync_time:
-                    existing_bm.front_sync_token = next_token
-                else:
-                    existing_bm.next_token = next_token or ""
+            # Don't store tokens on individual bookmarks anymore
 
         if sync_time:
             logger.debug(
-                f"Updating last_front_sync_time for user {user_id} to {sync_time}"
+                f"Updating front_sync_token and last_front_sync_time for user {user_id}"
             )
+            await self.update_front_sync_token(db, user_id, next_token)
             await self.update_last_sync_time(db, user_id, sync_time)
+        else:
+            if next_token:
+                logger.debug(f"Updating next_token for user {user_id}")
+                await self.update_next_token(db, user_id, next_token)
 
         try:
             await db.commit()
