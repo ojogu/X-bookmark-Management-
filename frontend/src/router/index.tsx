@@ -12,6 +12,9 @@ import FoldersPage from '@/pages/FoldersPage'
 import FolderPage from '@/pages/FolderPage'
 import TagsPage from '@/pages/TagsPage'
 import ProfilePage from '@/pages/ProfilePage'
+import AdminOverview from '@/pages/admin/AdminOverview'
+import AdminLoginPage from '@/pages/admin/AdminLoginPage'
+import AdminProtectedRoute from '@/router/AdminProtectedRoute'
 
 export default function Router() {
   return (
@@ -39,6 +42,19 @@ export default function Router() {
           <Route path="folders/:id" element={<FolderPage />} />
           <Route path="tags" element={<TagsPage />} />
           <Route path="profile" element={<ProfilePage />} />
+        </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminProtectedRoute>
+              <AppLayout />
+            </AdminProtectedRoute>
+          }
+        >
+          <Route index element={<AdminOverview />} />
         </Route>
 
         {/* Catch-all */}

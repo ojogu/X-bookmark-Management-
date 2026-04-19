@@ -114,6 +114,11 @@ def fetch_user_id_for_front_sync_task(self):
             logger.info(f"Fetched {len(user_ids)} user IDs.")
 
             for user_id in user_ids:
+                user = await user_service.check_if_user_exists_user_id(user_id)
+                if user and user.role == "admin":
+                    logger.info(f"Skipping admin user_id={user_id}")
+                    continue
+
                 logger.info(f"Enqueuing front_sync_bookmark_task for user_id={user_id}")
                 front_sync_bookmark_task.delay(user_id)
 
@@ -329,6 +334,11 @@ def fetch_user_id_for_backfill_task(self):
             user_ids = await user_service.fetch_pending_backfill_user_ids()
 
         for user_id in user_ids:
+            user = await user_service.check_if_user_exists_user_id(user_id)
+            if user and user.role == "admin":
+                logger.info(f"Skipping admin user_id={user_id}")
+                continue
+
             backfill_bookmark_task.delay(user_id)
 
         return {"queued": len(user_ids)}

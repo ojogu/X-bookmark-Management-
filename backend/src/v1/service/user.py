@@ -129,7 +129,7 @@ class UserService:
             # await self.db.flush()
             await self.db.commit()
             await self.db.refresh(user_tokens)
-            logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}")
+            logger.info(f"Successfully stored token for user_id: {user_tokens.user_id}, access token: {user_tokens.access_token}, refresh token: {user_tokens.refresh_token}")
             return user_tokens
         except SQLAlchemyError as e:
             await self.db.rollback()

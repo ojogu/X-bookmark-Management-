@@ -33,6 +33,7 @@ dependencies = [
     "opentelemetry-instrumentation-starlette>=0.60b1",
     "opentelemetry-instrumentation-urllib3>=0.60b1",
     "ojogu-gitai>=0.1.0",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [dependency-groups]

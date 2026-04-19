@@ -22,8 +22,15 @@ export const authStore = {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
   },
 
-  setAccessToken(accessToken: string) {
+  setAccessToken(accessToken: string, storage: 'memory' | 'local' = 'memory') {
     inMemoryAccessToken = accessToken
+    if (storage === 'local') {
+      localStorage.setItem('savestack_admin_token', accessToken)
+    }
+  },
+
+  getAdminToken(): string | null {
+    return inMemoryAccessToken || localStorage.getItem('savestack_admin_token')
   },
 
   clearTokens() {

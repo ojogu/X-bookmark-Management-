@@ -37,6 +37,9 @@ class User(BaseModel):
     front_sync_token = sa.Column(sa.String, nullable=True)
     next_token = sa.Column(sa.String, nullable=True)
     is_backfill_complete = sa.Column(sa.Boolean, default=False)
+    email = sa.Column(sa.String, unique=True, nullable=True)
+    password_hash = sa.Column(sa.String, nullable=True)
+    role = sa.Column(sa.String, default="user")
     token = relationship("UserToken", uselist=False, back_populates="user")
 
 
