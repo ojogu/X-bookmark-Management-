@@ -46,7 +46,7 @@ class Post(BaseModel):
 class Bookmark(BaseModel):
     internal_id: str
     post: Post
-    author: Author
+    author: Optional[Author] = None
 
 
 # ------------------

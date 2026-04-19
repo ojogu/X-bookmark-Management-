@@ -283,6 +283,8 @@ class TwitterService:
 
             if first_page:
                 logger.info(f"Successfully fetched bookmarks for user: {user_id}")
+                logger.info(f"response_data keys: {response_data.keys() if isinstance(response_data, dict) else type(response_data)}")
+                logger.info(f"includes present: {'includes' in response_data}")
                 return response_data
             else:
                 logger.warning(f"No bookmarks found for user: {user_id}")

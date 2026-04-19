@@ -29,6 +29,17 @@ interface BookmarkCardProps {
   isDeleting?: boolean
 }
 
+const openTweet = (tweetId: string) => {
+  const appUrl = `twitter://status?id=${tweetId}`
+  const webUrl = `https://x.com/i/web/status/${tweetId}`
+
+  window.location.href = appUrl
+
+  setTimeout(() => {
+    window.location.href = webUrl
+  }, 1500)
+}
+
 export default function BookmarkCard({
   bookmark,
   onDelete,
@@ -46,13 +57,17 @@ export default function BookmarkCard({
   const [open, setOpen] = useState(false)
 
   return (
-    <article
-      className={`group relative rounded-xl border bg-card p-4 transition-colors hover:border-border-strong dark:bg-bg-card dark:border-border-subtle dark:hover:border-border-strong ${
-        isRead ? 'border-border-subtle' : 'border-border-strong'
-      } ${isDeleting ? 'pointer-events-none opacity-50' : ''}`}
+    <div
+      onClick={() => openTweet(id)}
+      style={{ cursor: 'pointer' }}
     >
-      {/* Unread indicator */}
-      {!isRead && (
+      <article
+        className={`group relative rounded-xl border bg-card p-4 transition-colors hover:border-border-strong dark:bg-bg-card dark:border-border-subtle dark:hover:border-border-strong ${
+          isRead ? 'border-border-subtle' : 'border-border-strong'
+        } ${isDeleting ? 'pointer-events-none opacity-50' : ''}`}
+      >
+        {/* Unread indicator */}
+        {!isRead && (
         <span className="absolute left-3.5 top-4 h-1.5 w-1.5 rounded-full bg-brand" />
       )}
 
@@ -100,6 +115,9 @@ export default function BookmarkCard({
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <button
+              onClick={(e) => {
+                e.stopPropagation()
+              }}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground dark:text-text-muted transition-all hover:bg-muted dark:hover:bg-bg-subtle ml-auto"
               title="More actions"
             >
@@ -200,6 +218,7 @@ export default function BookmarkCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </article>
+      </article>
+    </div>
   )
 }

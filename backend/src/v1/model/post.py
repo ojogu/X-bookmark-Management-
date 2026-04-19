@@ -37,7 +37,7 @@ class Post(BaseModel):
     lang = sa.Column(sa.String, nullable=False)
     possibly_sensitive = sa.Column(sa.Boolean, nullable=False)
 
-    author_id = sa.Column(sa.UUID, sa.ForeignKey("authors.id"), nullable=False)
+    author_id = sa.Column(sa.UUID, sa.ForeignKey("authors.id"), nullable=True)
 
     # relationship back to media
     medias = relationship("Media", backref="posts")

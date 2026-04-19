@@ -44,7 +44,8 @@ observer.observe(document.documentElement, { attributes: true, attributeFilter: 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000,
+      staleTime: 10 * 1000,
+      refetchOnWindowFocus: true,
       retry: 1,
     },
   },

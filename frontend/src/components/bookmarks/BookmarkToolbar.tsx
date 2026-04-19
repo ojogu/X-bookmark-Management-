@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react'
+import { Search, SlidersHorizontal, ArrowUpDown, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,6 +12,7 @@ import {
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import type { SortOption, FilterState, Tag } from '@/types'
+import { useSyncStatus, useManualSync } from '@/features/bookmarks/hooks'
 
 const SORT_LABELS: Record<SortOption, string> = {
   'date-desc': 'Newest first',
@@ -42,12 +43,26 @@ export default function BookmarkToolbar({
   totalCount,
 }: BookmarkToolbarProps) {
   const activeFilterCount = filter.tagIds.length + (filter.folderId ? 1 : 0)
+  const { data: syncStatus } = useSyncStatus()
+  const syncMutation = useManualSync()
 
   function toggleTag(tagId: string) {
     const newTagIds = filter.tagIds.includes(tagId)
       ? filter.tagIds.filter((t) => t !== tagId)
       : [...filter.tagIds, tagId]
     onFilterChange({ ...filter, tagIds: newTagIds })
+  }
+
+  function formatLastSynced(isoString: string | null): string {
+    if (!isoString) return 'Never'
+    const date = new Date(isoString)
+    const diff = Date.now() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    return `${Math.floor(hours / 24)}d ago`
   }
 
   return (
@@ -131,10 +146,22 @@ export default function BookmarkToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+
+        {/* Sync */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          className="h-9 gap-1.5 border-border-subtle bg-bg-subtle text-text-secondary hover:text-text-primary"
+        >
+          <RefreshCw size={13} className={syncMutation.isPending ? 'animate-spin' : ''} />
+          <span className="hidden sm:inline">{syncMutation.isPending ? 'Syncing...' : 'Sync'}</span>
+        </Button>
       </div>
 
       {/* Active filters chips + count */}
-      {(filter.tagIds.length > 0 || totalCount !== undefined) && (
+      {(filter.tagIds.length > 0 || totalCount !== undefined || syncStatus?.last_sync_time) && (
         <div className="flex items-center gap-2">
           {filter.tagIds.length > 0 &&
             filter.tagIds.map((id) => {
@@ -151,6 +178,12 @@ export default function BookmarkToolbar({
                 </button>
               )
             })}
+
+          {syncStatus?.last_sync_time && (
+            <span className="text-xs text-text-muted">
+              Last synced: {formatLastSynced(syncStatus.last_sync_time)}
+            </span>
+          )}
 
           {totalCount !== undefined && (
             <span className="ml-auto text-xs text-text-muted">

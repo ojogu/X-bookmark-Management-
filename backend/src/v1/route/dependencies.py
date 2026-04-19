@@ -19,17 +19,21 @@ def get_user_service(db: AsyncSession = Depends(get_session)):
     return UserService(db=db)
 
 
-def get_bookmark_service(user_service: UserService = Depends(get_user_service)):
+def get_bookmark_service(
+    db: AsyncSession = Depends(get_session),
+    user_service: UserService = Depends(get_user_service),
+):
     """
     Dependency function to get an instance of BookmarkService.
 
     Args:
+        db: The database session.
         user_service (UserService): The user service dependency.
 
     Returns:
         BookmarkService: An instance of the BookmarkService service.
     """
-    return BookmarkService(user_service=user_service)
+    return BookmarkService(db=db, user_service=user_service)
 
 
 def get_folder_service():

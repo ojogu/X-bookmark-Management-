@@ -63,3 +63,14 @@ export interface PaginatedResponse<T> {
     hasMore: boolean
   }
 }
+
+export interface SyncStatus {
+  last_sync_time: string | null
+  is_backfill_complete: boolean
+}
+
+export interface SyncResponse {
+  status: string
+  message: string
+  last_sync_time?: string | null
+}

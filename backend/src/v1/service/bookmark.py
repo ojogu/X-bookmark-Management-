@@ -49,7 +49,8 @@ logger = get_logger(__name__)
 
 
 class BookmarkService:
-    def __init__(self, user_service: UserService = None):
+    def __init__(self, db: AsyncSession = None, user_service: UserService = None):
+        self.db = db
         self.user_service = user_service
 
     async def check_if_author_exists(self, db: AsyncSession, author_id):
@@ -93,6 +94,50 @@ class BookmarkService:
         if not result:
             return None
         return result.scalar_one_or_none()
+
+    async def get_existing_post_ids(
+        self, db: AsyncSession, user_id: UUID, post_ids: list
+    ) -> set:
+        """Bulk-check which post_ids exist in DB for a user. Returns set of existing post_ids."""
+        if not post_ids:
+            return set()
+
+        result = await db.execute(
+            sa.select(PostModel.post_id)
+            .join(BookmarkModel, BookmarkModel.post_id == PostModel.id)
+            .where(
+                BookmarkModel.user_id == user_id,
+                PostModel.post_id.in_(post_ids),
+            )
+        )
+        return set(row[0] for row in result.fetchall())
+
+    async def fetch_front_watermark_id(self, db: AsyncSession, user_id):
+        """Fetch the front_watermark_id (newest bookmark seen) for cold start detection."""
+        result = await db.execute(
+            sa.select(User.front_watermark_id).where(User.id == user_id)
+        )
+        if not result:
+            return None
+        return result.scalar_one_or_none()
+
+    async def update_front_watermark_id(
+        self, db: AsyncSession, user_id, watermark_id: str
+    ):
+        """Update the front_watermark_id (newest bookmark seen)."""
+        await db.execute(
+            sa.update(User)
+            .where(User.id == user_id)
+            .values(front_watermark_id=watermark_id)
+        )
+        await db.commit()
+
+    async def update_backfill_cursor(self, db: AsyncSession, user_id, cursor: str):
+        """Update the backfill cursor (next_token) for backfill worker."""
+        await db.execute(
+            sa.update(User).where(User.id == user_id).values(next_token=cursor)
+        )
+        await db.commit()
 
     async def get_last_sync_time(self, db: AsyncSession, user_id):
         """Get the last successful front sync timestamp for a user."""
@@ -181,7 +226,7 @@ class BookmarkService:
         query = (
             sa.select(BookmarkModel, PostModel, AuthorModel)
             .join(PostModel, BookmarkModel.post_id == PostModel.id)
-            .join(AuthorModel, PostModel.author_id == AuthorModel.id)
+            .outerjoin(AuthorModel, PostModel.author_id == AuthorModel.id)
             .where(BookmarkModel.user_id == user_id)
         )
 
@@ -190,8 +235,14 @@ class BookmarkService:
             query = query.where(
                 sa.or_(
                     PostModel.text.ilike(search_pattern),
-                    AuthorModel.name.ilike(search_pattern),
-                    AuthorModel.username.ilike(search_pattern),
+                    sa.and_(
+                        AuthorModel.name.isnot(None),
+                        AuthorModel.name.ilike(search_pattern),
+                    ),
+                    sa.and_(
+                        AuthorModel.username.isnot(None),
+                        AuthorModel.username.ilike(search_pattern),
+                    ),
                 )
             )
 
@@ -227,13 +278,13 @@ class BookmarkService:
         users_map = {}
 
         for bookmark, post, author in rows:
-            author_x_id = author.author_id_from_x
-            if author_x_id not in users_map:
+            author_x_id = author.author_id_from_x if author else ""
+            if author_x_id and author_x_id not in users_map:
                 users_map[author_x_id] = {
                     "id": author_x_id,
-                    "username": author.username,
-                    "name": author.name,
-                    "profile_image_url": author.profile_image_url,
+                    "username": author.username if author else "",
+                    "name": author.name if author else "",
+                    "profile_image_url": author.profile_image_url if author else None,
                 }
 
             data.append(
@@ -266,12 +317,18 @@ class BookmarkService:
             search_pattern = f"%{search}%"
             count_query = (
                 count_query.join(PostModel, BookmarkModel.post_id == PostModel.id)
-                .join(AuthorModel, PostModel.author_id == AuthorModel.id)
+                .outerjoin(AuthorModel, PostModel.author_id == AuthorModel.id)
                 .where(
                     sa.or_(
                         PostModel.text.ilike(search_pattern),
-                        AuthorModel.name.ilike(search_pattern),
-                        AuthorModel.username.ilike(search_pattern),
+                        sa.and_(
+                            AuthorModel.name.isnot(None),
+                            AuthorModel.name.ilike(search_pattern),
+                        ),
+                        sa.and_(
+                            AuthorModel.username.isnot(None),
+                            AuthorModel.username.ilike(search_pattern),
+                        ),
                     )
                 )
             )
@@ -342,22 +399,38 @@ class BookmarkService:
             )
             author_data = (
                 bm.author.model_dump()
-                if hasattr(bm, "author")
+                if hasattr(bm, "author") and bm.author
                 else bm.model_dump().get("author")
             )
 
-            logger.debug(f"Checking author {author_data['id']}")
-            author = await self.check_if_author_exists(db, author_data["id"])
-            if not author:
-                logger.debug(f"Creating new author record for {author_data['id']}")
-                author = AuthorModel(
-                    username=author_data.get("username", ""),
-                    name=author_data.get("name", ""),
-                    profile_image_url=str(author_data.get("profile_image_url", "")),
-                    author_id_from_x=author_data.get("id", ""),
+            author_model = None
+            if author_data and author_data.get("id"):
+                logger.debug(f"Checking author {author_data['id']}")
+                author_model = await self.check_if_author_exists(db, author_data["id"])
+                if author_model:
+                    logger.debug(f"Updating existing author {author_data['id']}")
+                    author_model.username = (
+                        author_data.get("username", "") or author_model.username
+                    )
+                    author_model.name = author_data.get("name", "") or author_model.name
+                    author_model.profile_image_url = (
+                        str(author_data.get("profile_image_url", ""))
+                        or author_model.profile_image_url
+                    )
+                else:
+                    logger.debug(f"Creating new author record for {author_data['id']}")
+                    author_model = AuthorModel(
+                        username=author_data.get("username", ""),
+                        name=author_data.get("name", ""),
+                        profile_image_url=str(author_data.get("profile_image_url", "")),
+                        author_id_from_x=author_data.get("id", ""),
+                    )
+                    db.add(author_model)
+                    await db.flush()
+            else:
+                logger.warning(
+                    f"No author data for post {post_data.get('id')} — skipping author link"
                 )
-                db.add(author)
-                await db.flush()
 
             logger.debug(f"Checking post {post_data['id']}")
             post = await self.check_if_post_exists(db, post_data["id"])
@@ -369,7 +442,7 @@ class BookmarkService:
                     created_at_from_twitter=post_data.get("created_at"),
                     lang=post_data.get("lang", ""),
                     possibly_sensitive=post_data.get("possibly_sensitive", False),
-                    author_id=author.id,
+                    author_id=author_model.id if author_model else None,
                 )
                 db.add(post)
                 await db.flush()
@@ -447,13 +520,22 @@ class BookmarkService:
             if not tweet:
                 continue
 
-            author_data = authors_map.get(tweet.get("author_id"), {}) or {}
-            author = Author(
-                id=author_data.get("id", ""),
-                username=author_data.get("username", ""),
-                name=author_data.get("name", ""),
-                profile_image_url=author_data.get("profile_image_url", None),
-            )
+            author_data = authors_map.get(
+                tweet.get("author_id")
+            )  # None if missing, not empty dict
+            if author_data:
+                author = Author(
+                    id=author_data.get("id", ""),
+                    username=author_data.get("username", ""),
+                    name=author_data.get("name", ""),
+                    profile_image_url=author_data.get("profile_image_url", None),
+                )
+            else:
+                logger.warning(
+                    f"No author data returned by X for author_id={tweet.get('author_id')} "
+                    f"on post={tweet.get('id')} — saving post with null author"
+                )
+                author = None
 
             metrics_data = tweet.get("public_metrics", {}) or {}
             metrics = Metrics(
@@ -662,7 +744,7 @@ class BookmarkService:
 
         result = await db.execute(
             sa.select(bookmark_folders).where(
-                bookmark_folders.c.bookmark_id == bookmark.post_id,
+                bookmark_folders.c.bookmark_id == bookmark.id,
                 bookmark_folders.c.folder_id == folder_id,
             )
         )
@@ -674,7 +756,7 @@ class BookmarkService:
 
         await db.execute(
             bookmark_folders.insert().values(
-                bookmark_id=bookmark.post_id, folder_id=folder_id
+                bookmark_id=bookmark.id, folder_id=folder_id
             )
         )
         await db.commit()
@@ -707,9 +789,19 @@ class BookmarkService:
         if not post:
             raise NotFoundError(f"Post not found")
 
+        result = await db.execute(
+            sa.select(BookmarkModel).where(
+                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+            )
+        )
+        bookmark = result.scalar_one_or_none()
+
+        if not bookmark:
+            raise NotFoundError(f"Bookmark not found")
+
         await db.execute(
             bookmark_folders.delete().where(
-                bookmark_folders.c.bookmark_id == post.id,
+                bookmark_folders.c.bookmark_id == bookmark.id,
                 bookmark_folders.c.folder_id == folder_id,
             )
         )
@@ -743,9 +835,19 @@ class BookmarkService:
             return []
 
         result = await db.execute(
+            sa.select(BookmarkModel).where(
+                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+            )
+        )
+        bookmark = result.scalar_one_or_none()
+
+        if not bookmark:
+            return []
+
+        result = await db.execute(
             sa.select(FolderModel)
             .join(bookmark_folders, FolderModel.id == bookmark_folders.c.folder_id)
-            .where(bookmark_folders.c.bookmark_id == post.id)
+            .where(bookmark_folders.c.bookmark_id == bookmark.id)
         )
         folders = result.scalars().all()
 
@@ -796,8 +898,19 @@ class BookmarkService:
             raise NotFoundError(f"Tag not found")
 
         result = await db.execute(
+            sa.select(BookmarkModel).where(
+                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+            )
+        )
+        bookmark = result.scalar_one_or_none()
+
+        if not bookmark:
+            raise NotFoundError(f"Bookmark not found")
+
+        result = await db.execute(
             sa.select(bookmark_tags).where(
-                bookmark_tags.c.bookmark_id == post.id, bookmark_tags.c.tag_id == tag_id
+                bookmark_tags.c.bookmark_id == bookmark.id,
+                bookmark_tags.c.tag_id == tag_id,
             )
         )
         existing = result.scalar_one_or_none()
@@ -807,7 +920,7 @@ class BookmarkService:
             return True
 
         await db.execute(
-            bookmark_tags.insert().values(bookmark_id=post.id, tag_id=tag_id)
+            bookmark_tags.insert().values(bookmark_id=bookmark.id, tag_id=tag_id)
         )
         await db.commit()
 
@@ -849,9 +962,20 @@ class BookmarkService:
         if not tag:
             raise NotFoundError(f"Tag not found")
 
+        result = await db.execute(
+            sa.select(BookmarkModel).where(
+                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+            )
+        )
+        bookmark = result.scalar_one_or_none()
+
+        if not bookmark:
+            raise NotFoundError(f"Bookmark not found")
+
         await db.execute(
             bookmark_tags.delete().where(
-                bookmark_tags.c.bookmark_id == post.id, bookmark_tags.c.tag_id == tag_id
+                bookmark_tags.c.bookmark_id == bookmark.id,
+                bookmark_tags.c.tag_id == tag_id,
             )
         )
         await db.commit()
@@ -884,9 +1008,19 @@ class BookmarkService:
             return []
 
         result = await db.execute(
+            sa.select(BookmarkModel).where(
+                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+            )
+        )
+        bookmark = result.scalar_one_or_none()
+
+        if not bookmark:
+            return []
+
+        result = await db.execute(
             sa.select(TagModel)
             .join(bookmark_tags, TagModel.id == bookmark_tags.c.tag_id)
-            .where(bookmark_tags.c.bookmark_id == post.id)
+            .where(bookmark_tags.c.bookmark_id == bookmark.id)
         )
         tags = result.scalars().all()
 

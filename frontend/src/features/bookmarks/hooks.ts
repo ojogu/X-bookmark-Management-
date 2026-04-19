@@ -8,6 +8,8 @@ import type {
   SortOption,
   FilterState,
   PaginatedResponse,
+  SyncStatus,
+  SyncResponse,
 } from '@/types'
 
 // ── Query keys ───────────────────────────────────────────────────
@@ -529,5 +531,55 @@ export function useGetBookmarkTags(bookmarkId: string) {
       return res.data
     },
     enabled: !!bookmarkId,
+  })
+}
+
+// ── Sync Status ────────────────────────────────────────────────────
+export function useSyncStatus() {
+  return useQuery({
+    queryKey: ['sync-status'],
+    queryFn: async () => {
+      const res = await client.get<SyncStatus>('/client/bookmarks/sync-status')
+      return res.data
+    },
+    refetchInterval: false,
+  })
+}
+
+// ── Manual Sync ───────────────────────────────────────────────────
+export function useManualSync() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.post<SyncResponse>('/client/sync')
+      return res.data
+    },
+    onSuccess: (data) => {
+      const lastSyncBefore = data.last_sync_time
+      if (!lastSyncBefore) {
+        return
+      }
+
+      const maxAttempts = 30
+      let attempts = 0
+
+      const poll = setInterval(async () => {
+        attempts++
+        
+        try {
+          const status = await qc.fetchQuery<SyncStatus>({ queryKey: ['sync-status'] })
+          
+          if (status?.last_sync_time !== lastSyncBefore || attempts >= maxAttempts) {
+            clearInterval(poll)
+            qc.invalidateQueries({ queryKey: bookmarkKeys.lists() })
+          }
+        } catch {
+          if (attempts >= maxAttempts) {
+            clearInterval(poll)
+          }
+        }
+      }, 1000)
+    },
   })
 }

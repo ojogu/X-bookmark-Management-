@@ -29,15 +29,15 @@ if os.getenv("CELERY_WORKER") == "true":
     CeleryInstrumentor().instrument()
 # ─────────────────────────────────────────────────────────────────
 
-interval = config.celery_beat_interval
+# interval = config.celery_beat_interval
 bg_task.conf.beat_schedule = {
     'get-all-front_sync_users-id': {
         'task': 'src.celery.task.fetch_user_id_for_front_sync_task',
-        'schedule': timedelta(minutes=interval)
+        'schedule': timedelta(minutes=5)
     },
     'get-all-backfill_users-id': {
         'task': 'src.celery.task.fetch_user_id_for_backfill_task',
-        'schedule': timedelta(minutes=15)
+        'schedule': timedelta(minutes=5)
     },
 }
 

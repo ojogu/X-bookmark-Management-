@@ -1,275 +1,242 @@
-# Bookmark Sync Architecture
+# Bookmark Sync Engineering
 
-## Overview
+## Problem Statement
 
-This document describes the bookmark synchronization architecture between X (Twitter) API and our database. The system uses a dual-strategy approach to keep bookmark data fresh while also ensuring historical data completeness.
+### The Bug
 
-### Why Two Sync Strategies?
+In v1 of the sync architecture, we used `front_sync_token` to track pagination for front sync:
 
-X API does not provide a way to filter bookmarks by time (no `start_time`/`end_time` parameters). This creates a fundamental challenge:
+```
+front_sync_bookmark_task:
+  1. Fetch bookmarks (using front_sync_token)
+  2. Save bookmarks
+  3. Store API's next_token as front_sync_token
+  4. If next_token exists → re-queue
+```
 
-- **Front sync**: User wants ONLY new bookmarks since last sync
-- **But API returns**: All bookmarks, newest first
+**The fatal flaw**: The X API's `next_token` always points to **older bookmarks** (paginating backward). Each run fetched older content:
 
-We solve this with two independent strategies:
+| Run | Tokens | Result |
+|-----|--------|--------|
+| 1 | `front_sync_token=NULL` | Fetch [A,B,C,D] (newest) → store next_token=F |
+| 2 | `front_sync_token=F` | Fetch [E,F,G,H] → older! |
+| 3 | `front_sync_token=H` | Fetch [I,J,K,L] → even older! |
 
-| Strategy | Purpose | When to Use |
-|----------|---------|-------------|
-| Front Sync | Keep current with new bookmarks | Runs frequently (every 5-15 min) |
-| Backfill | Catch historical data | Runs less frequently (hourly) |
+**Result**: Each front sync run went backward through history, never catching new bookmarks.
+
+### Why No Timestamp Filter?
+
+X API's `/get_bookmarks` endpoint **does not support** `start_time` or `end_time` parameters. These only work with the Search API, not Bookmarks.
+
+### The Gap
+
+```
+X bookmarks: A, B, C, D, E, F, G, H, I, J... (newest → oldest)
+
+Buggy runs:
+  Run 1: Fetched A, B → stored next_token pointing to C
+  Run 2: Started from next_token → fetched F, G... (SKIPPED C, D, E!)
+```
+
+**C, D, E were lost** - the next_token jumped past them.
 
 ---
 
-## Architecture Components
+## Solution: Dual-State Architecture
 
-### 1. Initial Fetch
+### Core Insight
 
-**Trigger**: When a user first connects their X account  
-**Purpose**: Bootstrap the system with recent bookmarks
+We need **two separate concepts**:
+1. **Front sync** - Always fetches newest, stops at boundary
+2. **Backfill** - Uses pagination token to fill historical gaps
+
+### New State Model
+
+| Field | Purpose | Set By |
+|-------|---------|--------|
+| `front_watermark_id` | ID of newest bookmark seen | Front sync |
+| `next_token` (backfill_cursor) | Pagination token for backfill | Front sync (first run only) |
+
+### Flow Diagram
 
 ```
-[User OAuth complete]
-         ↓
-[initial_fetch_task(user_id)]
-         ↓
-Call API: get_bookmarks(max_results=20)
-         ↓
-Save to DB:
-  - bookmarks
-  - front_sync_token = null (no pagination yet)
-  - next_token = response.next_token (for backfill)
-  - is_backfill_complete = false
-  - last_front_sync_time = null (will be set by first front sync)
+┌─────────────────────────────────────────────────────────────────┐
+│ FRONT SYNC (runs frequently, fetches newest)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ State: front_watermark_id                                    │
+│                                                          │
+│ ON EACH RUN:                                              │
+│  1. Fetch max_results=2 (no pagination token)             │
+│  2. IF front_watermark_id IS NULL (cold start):            │
+│      - Save all bookmarks                               │
+│      - front_watermark_id = newest post_id              │
+│      - next_token = API's next_token  ← BACKFILL USES   │
+│      - STOP                                           │
+│  3. IF front_watermark_id IS SET (subsequent):          │
+│      - Bulk-check post_ids against DB                  │
+│      - Walk: hit existing → STOP, else collect new      │
+│      - Save new bookmarks                            │
+│      - front_watermark_id = newest post_id           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+                     Stores next_token
+                              ↓
+┌───────────────────────────────────────────────────────────���─────┐
+│ BACKFILL (runs independently, fills historical)              │
+├─────────────────────────────────────────────────────────────────┤
+│ State: next_token (backfill_cursor)                       │
+│                                                          │
+│ ON EACH RUN:                                              │
+│  1. IF next_token IS NULL: do nothing (not cold start)    │
+│  2. Fetch using next_token as pagination_token       │
+│  3. Upsert bookmarks (insert new, update existing)   │
+│  4. Update next_token from response              │
+│  5. If no next_token → backfill complete          │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Design Decision**: Limit to 20 bookmarks (X API max per request) to minimize API credits usage. This gives us a starting point, then front sync takes over.
+### Recovery Flow (One-Time)
 
-**Why not full sync?**
-- X API rate limits (15 requests per 15 min for most apps)
-- Users may have thousands of bookmarks
-- Full initial sync would consume excessive API credits
-- Front sync will gradually pull newer bookmarks
+```
+After code deploys with fix:
+
+First Front Sync Run:
+  - Fetch [A,B] (newest)
+  - Save [A,B]
+  - front_watermark_id = A
+  - next_token = token_for_C  ← Backfill uses this!
+
+First Backfill Run:
+  - Read next_token (points to C)
+  - Fetch [C,D] → upsert (recovers C, D!)
+  - Fetch [E,F] → upsert (recovers E, F!)
+  - Continue until no next_token
+  - Done
+```
 
 ---
 
-### 2. Front Sync
+## Implementation Details
 
-**Trigger**: Celery Beat cron (every 5-15 minutes)  
-**Purpose**: Fetch newly saved bookmarks since last sync
+### Database Schema
 
-```
-[Celery Beat] → fetch_user_id_for_front_sync_task
-         ↓
-[For each user] → front_sync_bookmark_task.delay(user_id)
-         ↓
-┌─────────────────────────────────────────────────────┐
-│ Loop:                                              │
-│  1. Get front_sync_token from DB (or None)         │
-│  2. Call API: get_bookmarks(                       │
-│       pagination_token=front_sync_token,           │
-│       max_results=20)                              │
-│  3. Save bookmarks (upsert - duplicates OK)        │
-│  4. response.next_token → save as front_sync_token │
-│  5. If response.next_token exists →               │
-│       re-queue: front_sync_bookmark_task.delay()   │
-│     else → STOP                                    │
-└─────────────────────────────────────────────────────┘
-         ↓
-Update: last_front_sync_time = now()
+```sql
+-- User table
+ALTER TABLE users ADD COLUMN front_watermark_id VARCHAR(50);
+
+-- Existing columns (retained for backfill)
+next_token: VARCHAR(50);  -- used by backfill worker
+is_backfill_complete: BOOLEAN;
+last_front_sync_time: TIMESTAMP;
 ```
 
-**Token Flow**:
-```
-User Table:
-  last_front_sync_time: "2025-01-15T10:00:00Z"
-  front_sync_token: "token_abc123"
-  
-Bookmark Table:
-  front_sync_token: "token_abc123"  ← used for pagination
-```
+### Code Structure
 
-**Re-queue mechanism**: Task re-queues itself (`self.delay(user_id)`) when there's a next_token. This prevents long-running tasks and allows better error handling per page.
+**BookmarkService helpers**:
+```python
+async def fetch_front_watermark_id(db, user_id) -> str:
+    """Get watermark for cold start detection."""
 
-**Trade-off**: Why re-queue instead of loop?
-- **Pro**: If one page fails, we don't lose progress on previous pages
-- **Pro**: Better observability - each page is a separate task
-- **Con**: More task overhead (more Celery messages)
-- **Alternative**: Loop internally - faster but riskier on failure
+async def update_front_watermark_id(db, user_id, watermark_id):
+    """Store newest bookmark ID."""
 
----
+async def update_backfill_cursor(db, user_id, cursor):
+    """Store next_token for backfill worker."""
 
-### 3. Backfill
-
-**Trigger**: Celery Beat cron (every 15-60 minutes)  
-**Purpose**: Fetch historical bookmarks that were missed or not yet synced
-
-```
-[Celery Beat] → fetch_user_id_for_backfill_task
-         ↓
-[For each user] → backfill_bookmark_task.delay(user_id)
-         ↓
-┌─────────────────────────────────────────────────────┐
-│ Loop:                                              │
-│  1. Get next_token from DB (or None)               │
-│  2. Call API: get_bookmarks(                       │
-│       pagination_token=next_token,                │
-│       max_results=20)                              │
-│  3. If no results →                               │
-│       set is_backfill_complete = true             │
-│       STOP                                         │
-│  4. Save bookmarks                                 │
-│  5. response.next_token → save as next_token     │
-│  6. If response.next_token exists →               │
-│       re-queue: backfill_bookmark_task.delay()    │
-│     else →                                        │
-│       set is_backfill_complete = true             │
-│       STOP                                         │
-└─────────────────────────────────────────────────────┘
+async def get_existing_post_ids(db, user_id, post_ids) -> set:
+    """Bulk-check which bookmarks exist in DB."""
 ```
 
-**Token Flow**:
-```
-User Table:
-  is_backfill_complete: false
-  
-Bookmark Table:
-  next_token: "token_xyz789"  ← used for pagination
-```
-
-**Completion detection**: When `response.next_token` is empty AND no bookmarks returned, mark `is_backfill_complete = true` to stop future backfill runs for this user.
-
----
-
-## Data Model
-
-### User Table Fields
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `last_front_sync_time` | DateTime | Timestamp of last successful front sync |
-| `is_backfill_complete` | Boolean | Flag to skip backfill when done |
-
-### Bookmark Table Fields
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `front_sync_token` | String | Pagination token for front sync |
-| `next_token` | String | Pagination token for backfill |
-| `is_backfill_complete` | Boolean | Per-user flag (actually on User table) |
-
-**Important**: Both tokens are stored per-bookmark but effectively represent the user's global pagination state. All bookmarks for a user share the same token values.
-
----
-
-## Rate Limiting
-
-### X API Limits (varies by app tier)
-
-- **Tier 1**: 15 requests per 15 minutes
-- **Tier 1.5**: 100 requests per 15 minutes  
-- **Tier 2**: 1000 requests per 15 minutes
-
-### Implementation Strategy
-
-Using `tenacity` library in `twitter.py`:
+### Front Sync Algorithm (Pseudocode)
 
 ```python
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=60),
-    retry=retry_if_exception_type((
-        httpx.ConnectError,
-        httpx.RequestError,
-        httpx.TimeoutException,
-        ExternalAPIError  # includes 429 handling
-    )),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True
-)
-async def get_bookmarks(...):
-    ...
-```
+def front_sync_bookmark_task(user_id):
+    # Check cold start
+    watermark = fetch_front_watermark_id(user_id)
+    is_cold_start = (watermark is None)
 
-**For 429 (Too Many Requests)**:
-- Exponential backoff: wait 2s, 4s, 8s... up to 60s
-- After 3 attempts, raise exception (task will retry later via Celery)
-- Log warning before each retry
+    # Fetch newest bookmarks (no pagination token)
+    response = x_api.get_bookmarks(max_results=2)
+    bookmarks = response.data
 
-**Trade-off**: Task-based retries vs. internal retries
-- Current: Each API call has internal retry (3 attempts)
-- Alternative: Fail immediately, let Celery re-queue task
-- **Decision**: Internal retry is simpler for now; can evolve if 429 is frequent
+    if is_cold_start:
+        # Cold start: save all, store state
+        save_bookmarks(bookmarks)
+        update_front_watermark_id(bookmarks[0].id)
+        update_backfill_cursor(response.next_token)
+        return
 
----
+    # Subsequent: check against DB
+    existing = get_existing_post_ids(post_ids)
 
-## Upsert Mechanism
+    for bookmark in bookmarks:
+        if bookmark.id in existing:
+            break  # boundary reached
+        collect new
 
-The system uses upsert (update or insert) to handle overlapping data:
-
-1. **No time filtering needed**: We don't filter by `created_at >= last_sync_time`
-2. **Duplicates are OK**: If a bookmark already exists, the upsert is idempotent
-3. **Race conditions**: Celery tasks run sequentially per user (via queue), reducing conflicts
-
-**How upsert works** in `BookmarkService.save_bookmarks()`:
-
-```python
-# Check if exists
-existing_bm = await self.check_if_bookmark_exists(db, post_id, user_id)
-
-if not existing_bm:
-    # Create new
-    bookmark = BookmarkModel(...)
-    db.add(bookmark)
-# If exists → do nothing (already in DB)
+    if new_bookmarks:
+        save_bookmarks(new_bookmarks)
+        update_front_watermark_id(new_bookmarks[0].id)
 ```
 
 ---
 
-## Task Queue Configuration
+## Trade-offs
 
-### Celery Queues
+| Decision | Trade-off | Rationale |
+|----------|----------|-----------|
+| max_results=2 | More API calls, but safer | X API rate limit handling |
+| Bulk-check vs. loop | Single DB query per page | Efficient for small pages |
+| Upsert in backfill | Extra writes, but idempotent | No need to deduplicate |
+| First run stores next_token | One-time credit waste | Enables backfill to continue |
+| Separate front + backfill | More complex | Required due to API limitations |
 
-| Queue | Purpose | Routing Key |
-|-------|---------|-------------|
-| `default` | General tasks | `default` |
-| `fetch_user_id_for_front_sync_task` | Cron trigger | `fetch_user_id_for_front_sync_task` |
-| `front_sync_bookmark_task` | Front sync worker | `front_sync_bookmark_task` |
-| `fetch_user_id_for_backfill_task` | Cron trigger | `fetch_user_id_for_backfill_task` |
-| `backfill_bookmark_task` | Backfill worker | `backfill_bookmark_task` |
+### Why Not Filter by Timestamp?
 
-### Celery Beat Schedule (Proposed)
+X API does not support time filtering for bookmarks. The boundary-check approach (Option 1) is the only viable solution.
 
-```python
-beat_schedule = {
-    'front-sync-every-5-minutes': {
-        'task': 'src.celery.task.fetch_user_id_for_front_sync_task',
-        'schedule': 300.0,  # 5 minutes
-    },
-    'backfill-every-15-minutes': {
-        'task': 'src.celery.task.fetch_user_id_for_backfill_task',
-        'schedule': 900.0,  # 15 minutes
-    },
-}
-```
+### Why max_results=2?
+
+Originally set to 2 for safety with X API rate limits. Could increase to 20 if needed, but keeping conservative for now.
 
 ---
 
-## Trade-offs Summary
+## Gap Recovery
 
-| Decision | Trade-off |
-|----------|------------|
-| Two sync strategies (front + backfill) | More complex, but solves X API limitations |
-| Re-queue instead of loop | More Celery overhead, but better failure isolation |
-| Upsert vs. time filter | Wastes API credits on old data, but simpler code |
-| 20 bookmarks per request | More API calls, but respects rate limits |
-| Internal retry + Celery retry | Double retry, but higher reliability |
+### What Was Lost
+
+C, D, E from the bug era cannot be recovered through front sync. Options:
+
+| Option | Action | Effort |
+|--------|--------|--------|
+| A. Do nothing | Accept the gap | Zero |
+| B. Manual | Find bookmark IDs, manually re-add | High |
+| C. Backfill from corrupted token | Run backfill from stored token | Medium |
+
+**Recommendation**: Run backfill once after deployment. It will paginate backward from the last stored token and recover any missing bookmarks.
 
 ---
 
 ## Future Improvements
 
-1. **WebSocket push**: Notify frontend when sync completes
-2. **Staleness indicator**: Show "Last synced: X min ago" in UI
-3. **Tier-based scheduling**: Adjust frequency based on user activity
-4. **Token persistence**: Consider storing next_token per-bookmark for granular recovery
-5. **Front sync optimization**: If `last_front_sync_time` is very old, warn user or limit sync window
+1. **Increase max_results**: Test with higher values (20-100) if rate limits allow
+2. **Backfill completion**: Mark user as "fully synced" after backfill completes
+3. **Sync status API**: Return `last_front_sync_time`, `is_backfill_complete` to frontend
+4. **Staleness detection**: Warn if sync hasn't run in N hours
+
+---
+
+## Migration
+
+```sql
+-- Add new column
+ALTER TABLE users ADD COLUMN front_watermark_id VARCHAR(50);
+
+-- Optional: clean up old buggy column
+ALTER TABLE users DROP COLUMN front_sync_token;
+```
+
+Run alembic:
+```bash
+alembic revision -m "add_front_watermark_id"
+```

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd "$(dirname "$0")/../backend"
+cd "$(dirname "$0")/backend"
 
 MESSAGE="${1:-}"
 

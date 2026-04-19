@@ -1,34 +1,60 @@
 # redis_client.py
 import json
 import redis.asyncio as redis
+import redis as redis_sync
 from typing import Optional
 from src.utils.config import config
 
 from src.utils.log import get_logger
+
 logger = get_logger(__name__)
 
 CACHE_TTL = 300
 REDIS_URL = config.redis_url
 
 _redis: Optional[redis.Redis] = None
+_redis_sync: Optional[redis_sync.Redis] = None
+
+
 async def setup_redis() -> redis.Redis:
+    """
+    Initialize the async Redis connection (used by FastAPI/async code).
+    """
     global _redis
     if _redis is None:
         logger.info(f"Initializing Redis connection to {REDIS_URL}")
         try:
             _redis = redis.from_url(REDIS_URL, decode_responses=True)
-            # logger.info("Redis connection established successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Redis connection: {str(e)}")
-            raise 
-        
+            raise
+
     return _redis
 
+
 async def get_redis() -> redis.Redis:
+    """
+    Get the async Redis client for use in async functions.
+    Raises RuntimeError if Redis hasn't been initialized via setup_redis().
+    """
     if _redis is None:
         logger.error("Redis connection not initialized")
         raise RuntimeError("Redis has not been initialized. Call setup_redis() first.")
     return _redis
+
+
+def get_redis_sync() -> redis_sync.Redis:
+    """
+    Get a synchronous Redis client for use in Celery tasks.
+    Celery tasks run synchronously, so we need a sync Redis client.
+    The connection is reused across tasks (singleton pattern).
+    """
+    global _redis_sync
+    if _redis_sync is None:
+        logger.debug("Initializing sync Redis connection for Celery tasks")
+        _redis_sync = redis_sync.from_url(REDIS_URL, decode_responses=True)
+    return _redis_sync
+
 
 async def get_or_fetch_cache(key: str, fetch_callback, ttl: int = CACHE_TTL):
     try:
@@ -63,6 +89,7 @@ async def get_or_fetch_cache(key: str, fetch_callback, ttl: int = CACHE_TTL):
         logger.error(f"Error in get_or_fetch_cache for key {key}: {str(e)}")
         raise
 
+
 async def set_cache(key: str, data, ttl: int = CACHE_TTL) -> bool:
     """
     Store `data` (JSON-serializable) under `key` with expiration `ttl` seconds.
@@ -77,7 +104,8 @@ async def set_cache(key: str, data, ttl: int = CACHE_TTL) -> bool:
     except Exception as e:
         logger.error(f"Failed to write cache for key {key}: {e}")
         return False
-    
+
+
 async def key_exist(key: str) -> bool:
     try:
         redis = await get_redis()
@@ -111,6 +139,7 @@ async def get_from_cache(key: str):
     except Exception as e:
         logger.error(f"Error retrieving cache for key {key}: {str(e)}")
         return None
+
 
 async def clear_cache() -> bool:
     try:
