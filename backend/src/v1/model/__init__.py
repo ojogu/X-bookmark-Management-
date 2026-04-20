@@ -3,6 +3,7 @@ from .post import Post
 from .bookmark import Bookmark, bookmark_folders, Folder
 from .author import Author
 from .tag import Tag, bookmark_tags
+from .admin import SyncJob, AdminAuditLog, ErrorLog
 
 __all__ = [
     "User",
@@ -13,4 +14,7 @@ __all__ = [
     "Author",
     "Tag",
     "bookmark_tags",
+    "SyncJob",
+    "AdminAuditLog",
+    "ErrorLog",
 ]

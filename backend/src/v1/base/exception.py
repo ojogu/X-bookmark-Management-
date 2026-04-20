@@ -34,6 +34,9 @@ class AlreadyExistsError(BaseExceptionClass):
 class InvalidEmailPassword(BaseExceptionClass):
     pass
 
+class Unauthorized(BaseExceptionClass):
+    pass
+
 
 class BadRequest(BaseExceptionClass):
     pass

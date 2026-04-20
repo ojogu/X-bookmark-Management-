@@ -3,7 +3,7 @@ from src.utils.xdk_client import xdk_client
 from src.utils.config import config
 from src.v1.service.user import UserService
 from src.v1.service.oauth_session import OAuthSessionService
-from src.v1.schemas.user import UserCreate, UserDataFromOauth, User_Token
+from src.v1.schema.user import UserCreate, UserDataFromOauth, User_Token
 from src.v1.service.interfaces import TokenRefreshService
 from datetime import datetime, timedelta, timezone
 from src.v1.auth.service import auth_service
@@ -22,6 +22,7 @@ from tenacity import (
 )
 from src.utils.log import get_logger
 from src.utils.retry import NETWORK_EXCEPTIONS
+from src.utils.exception import ExternalAPIError
 
 logger = get_logger(__name__)
 
@@ -182,10 +183,7 @@ class TwitterAuthService(TokenRefreshService):
             logger.error(f"Token exchange failed: {str(e)}", exc_info=True)
             raise
 
-    class RefreshTokenError(Exception):
-        """Raised when token refresh fails with retryable status"""
 
-        pass
 
     @retry(
         stop=stop_after_attempt(2),
@@ -195,7 +193,7 @@ class TwitterAuthService(TokenRefreshService):
                 httpx.ConnectError,
                 httpx.RequestError,
                 httpx.TimeoutException,
-                RefreshTokenError,
+                ExternalAPIError,
             )
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -229,8 +227,9 @@ class TwitterAuthService(TokenRefreshService):
                     logger.warning(
                         f"Token refresh failed with retryable status: {response.status_code} - {response.text}"
                     )
-                    raise RefreshTokenError(
-                        f"Token refresh failed: {response.status_code} - {response.text}"
+                    raise ExternalAPIError(
+                        message = f"Token refresh failed: {response.text}",
+                        status_code=response.status_code
                     )
                 else:
                     logger.error(
@@ -243,7 +242,7 @@ class TwitterAuthService(TokenRefreshService):
         except (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException) as e:
             logger.error(f"Network error during token refresh: {e}")
             raise
-        except RefreshTokenError:
+        except ExternalAPIError:
             raise
         except Exception as e:
             logger.error(f"Unexpected error during token refresh: {e}")

@@ -33,7 +33,7 @@ from src.v1.base.exception import (
     NotActive,
     BaseExceptionClass,
 )
-from src.v1.schemas.user import UserInfoFromX
+from src.v1.schema.user import UserInfoFromX
 
 access_token_bearer = AccessTokenBearer()
 logger = get_logger(__name__)

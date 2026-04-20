@@ -5,14 +5,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from src.v1.model.users import User, UserToken
-from src.v1.base.exception import NotFoundError, BadRequest, ServerError
+from src.v1.base.exception import NotFoundError, BadRequest, ServerError, Unauthorized
 from sqlalchemy.exc import SQLAlchemyError
 from src.utils.log import get_logger
 from src.utils.config import config
 
 from src.v1.auth.service import auth_service, encrypt_token
-from src.v1.admin.password import hash_password, verify_password
-from src.v1.admin.schema import (
+from src.v1.auth.service import hash_password, verify_password
+from src.v1.schema import (
     UserRole,
     UserStatus,
     SyncJobStatus,
@@ -40,19 +40,21 @@ class AdminAuthService:
             raise BadRequest("Invalid email or password")
 
         if user.role != "admin":
-            raise BadRequest("Admin access required")
+            raise Unauthorized()
 
-        token_data = {
-            "user": {
-                "user_id": str(user.id),
-                "email": user.email,
-                "role": user.role,
-            }
+        user_data = {
+            "user_id": str(user.id),
+            "email": user.email,
+            "role": user.role,
         }
 
-        access_token = auth_service.create_access_token(token_data)
+        access_token = auth_service.create_access_token(user_data)
+        refresh_token = auth_service.create_access_token(user_data, refresh=True)
 
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token, 
+            "refresh_token": refresh_token,
+            "token_type": "bearer"}
 
     async def change_password(
         self, user_id: str, current_password: str, new_password: str
@@ -181,7 +183,7 @@ class StatsService:
         )
         bookmarks_monthly = bookmarks_monthly_result.scalar() or 0
 
-        from src.v1.admin.models import SyncJob
+        from src.v1.model import SyncJob
 
         jobs_today_result = await self.db.execute(
             select(func.count(SyncJob.id)).where(SyncJob.started_at >= today_start)
@@ -418,7 +420,7 @@ class AuditService:
         ip_address: str = None,
         details: dict = None,
     ):
-        from src.v1.admin.models import AdminAuditLog
+        from src.v1.model import AdminAuditLog
 
         log_entry = AdminAuditLog(
             admin_id=admin_id,
@@ -474,7 +476,7 @@ class HealthService:
         }
 
     async def get_error_logs(self, level: str = "error", limit: int = 50) -> list[dict]:
-        from src.v1.admin.models import ErrorLog
+        from src.v1.model import ErrorLog
 
         result = await self.db.execute(
             select(ErrorLog)

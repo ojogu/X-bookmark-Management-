@@ -1,7 +1,7 @@
 from src.v1.base.model import BaseModel
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class SyncJob(BaseModel):

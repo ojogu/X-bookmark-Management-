@@ -1,7 +1,7 @@
 from src.utils.xdk_client import xdk_client
 from src.utils.log import get_logger
 from typing import Dict, List, Any, Optional, Iterator
-from src.v1.schemas.user import UserInfoFromX
+from src.v1.schema.user import UserInfoFromX
 from src.v1.base.exception import ExternalAPIError
 from xdk.users.models import CreateBookmarkRequest
 import logging

@@ -21,6 +21,7 @@ interface BookmarkFeedProps {
   emptyMessage?: string
   emptyDescription?: string
   onAddBookmark?: () => void
+  onCreateFolder?: (callback: (folderId: string) => void) => void
 }
 
 function SkeletonCard() {
@@ -60,6 +61,7 @@ export default function BookmarkFeed({
   emptyMessage = 'No bookmarks found',
   emptyDescription = 'Try adjusting your search or filters.',
   onAddBookmark,
+  onCreateFolder,
 }: BookmarkFeedProps) {
   if (isLoading) {
     return (
@@ -129,6 +131,7 @@ export default function BookmarkFeed({
           availableTags={availableTags}
           bookmarkFolders={bookmarkFoldersMap[bookmark.id] || []}
           isDeleting={deletingId === bookmark.id}
+          onCreateFolder={onCreateFolder}
         />
       ))}
     </div>

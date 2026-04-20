@@ -9,7 +9,7 @@ from src.v1.model.users import User, UserToken
 from sqlalchemy.exc import IntegrityError, DatabaseError, SQLAlchemyError
 from src.v1.service.user import UserService
 from datetime import datetime, timedelta, timezone
-from src.v1.schemas.bookmark import (
+from src.v1.schema.bookmark import (
     BookmarkResponse,
     Author,
     Meta,

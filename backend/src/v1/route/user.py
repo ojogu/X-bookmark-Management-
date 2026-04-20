@@ -4,7 +4,7 @@ from src.utils.db import get_session
 from src.v1.model.users import User
 from src.v1.route.dependencies import get_current_user
 from src.v1.service.user import UserService
-from src.v1.schemas.user import UserInfoFromX
+from src.v1.schema.user import UserInfoFromX
 
 user_router = APIRouter(prefix="", tags=["user"])
 

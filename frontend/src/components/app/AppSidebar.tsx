@@ -1,4 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +28,7 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
+  FolderPlus,
   LogOut,
   Moon,
   Sun,
@@ -37,6 +39,7 @@ import { useProfile, useFolders, useUnreadBookmarks } from '@/features/bookmarks
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Wordmark } from '@/components/common/Wordmark'
+import { CreateFolderDialog } from '@/components/folders/CreateFolderDialog'
 
 export default function AppSidebar() {
   const location = useLocation()
@@ -45,6 +48,7 @@ export default function AppSidebar() {
   const { data: folders } = useFolders()
   const { data: unread } = useUnreadBookmarks()
   const { theme, setTheme } = useTheme()
+  const [createFolderOpen, setCreateFolderOpen] = useState(false)
 
   const unreadCount = unread?.data?.length ?? 0
 
@@ -155,19 +159,30 @@ export default function AppSidebar() {
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {folders && folders.length > 0 ? (
-                      folders.map((folder: { id: string; name: string; bookmarkCount: number }) => (
-                        <SidebarMenuSubItem key={folder.id}>
+                      <>
+                        {folders.map((folder: { id: string; name: string; bookmarkCount: number }) => (
+                          <SidebarMenuSubItem key={folder.id}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location.pathname === `/dashboard/folders/${folder.id}`}
+                            >
+                              <NavLink to={`/dashboard/folders/${folder.id}`}>
+                                <span className="flex-1 truncate">{folder.name}</span>
+                                <span className="text-xs text-muted-foreground dark:text-text-muted">{folder.bookmarkCount}</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                        <SidebarMenuSubItem>
                           <SidebarMenuSubButton
-                            asChild
-                            isActive={location.pathname === `/dashboard/folders/${folder.id}`}
+                            onClick={() => setCreateFolderOpen(true)}
+                            className="text-muted-foreground dark:text-text-muted hover:text-foreground dark:hover:text-foreground"
                           >
-                            <NavLink to={`/dashboard/folders/${folder.id}`}>
-                              <span className="flex-1 truncate">{folder.name}</span>
-                              <span className="text-xs text-muted-foreground dark:text-text-muted">{folder.bookmarkCount}</span>
-                            </NavLink>
+                            <FolderPlus size={14} />
+                            <span>Create Folder</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                      ))
+                      </>
                     ) : (
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
@@ -222,6 +237,11 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      <CreateFolderDialog
+        open={createFolderOpen}
+        onOpenChange={setCreateFolderOpen}
+      />
     </Sidebar>
   )
 }

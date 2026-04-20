@@ -5,7 +5,7 @@ from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.service.bookmark import BookmarkService
 from src.v1.route.dependencies import get_current_user, get_bookmark_service
-from src.v1.schemas import MarkReadRequest, BookmarkFolderRequest, BookmarkTagRequest
+from src.v1.schema import MarkReadRequest, BookmarkFolderRequest, BookmarkTagRequest
 from src.v1.base.exception import ExternalAPIError
 from typing import Optional
 

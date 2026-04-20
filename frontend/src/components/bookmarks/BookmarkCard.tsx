@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, Check, Circle, MoreHorizontal, Folder, Tag, X } from 'lucide-react'
+import { Trash2, Check, Circle, MoreHorizontal, Folder, FolderPlus, Tag, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatRelativeTime } from '@/lib/utils'
 import type { Bookmark, Folder as FolderType, Tag as TagType } from '@/types'
+import { CreateFolderDialog } from '@/components/folders/CreateFolderDialog'
 
 interface BookmarkCardProps {
   bookmark: Bookmark
@@ -27,6 +28,7 @@ interface BookmarkCardProps {
   availableTags?: TagType[]
   bookmarkFolders?: string[]
   isDeleting?: boolean
+  onCreateFolder?: (callback: (folderId: string) => void) => void
 }
 
 const openTweet = (tweetId: string) => {
@@ -52,9 +54,11 @@ export default function BookmarkCard({
   availableTags = [],
   bookmarkFolders = [],
   isDeleting,
+  onCreateFolder,
 }: BookmarkCardProps) {
   const { id, author, text, savedAt, tags, faviconUrl, isRead } = bookmark
   const [open, setOpen] = useState(false)
+  const [createFolderOpen, setCreateFolderOpen] = useState(false)
 
   return (
     <div
@@ -143,33 +147,54 @@ export default function BookmarkCard({
             )}
 
             {/* Add to folder submenu */}
-            {onAddToFolder && availableFolders.length > 0 && (
+            {(onAddToFolder || onCreateFolder) && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <Folder size={14} className="mr-2" />
                   Add to folder
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  {availableFolders.map((folder) => {
-                    const isInFolder = bookmarkFolders.includes(folder.id)
-                    return (
+                  {availableFolders.length > 0 ? (
+                    availableFolders.map((folder) => {
+                      const isInFolder = bookmarkFolders.includes(folder.id)
+                      return (
+                        <DropdownMenuItem
+                          key={folder.id}
+                          onClick={() => {
+                            if (isInFolder && onRemoveFromFolder) {
+                              onRemoveFromFolder(id, folder.id)
+                            } else {
+                              onAddToFolder?.(id, folder.id)
+                            }
+                            setOpen(false)
+                          }}
+                        >
+                          {isInFolder && <X size={14} className="mr-2" />}
+                          {folder.name}
+                          {isInFolder && <span className="ml-auto text-xs">✓</span>}
+                        </DropdownMenuItem>
+                      )
+                    })
+                  ) : (
+                    <DropdownMenuItem disabled className="text-muted-foreground">
+                      No folders yet
+                    </DropdownMenuItem>
+                  )}
+                  {onCreateFolder && (
+                    <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        key={folder.id}
                         onClick={() => {
-                          if (isInFolder && onRemoveFromFolder) {
-                            onRemoveFromFolder(id, folder.id)
-                          } else {
-                            onAddToFolder(id, folder.id)
-                          }
                           setOpen(false)
+                          setCreateFolderOpen(true)
                         }}
+                        className="text-muted-foreground cursor-pointer"
                       >
-                        {isInFolder && <X size={14} className="mr-2" />}
-                        {folder.name}
-                        {isInFolder && <span className="ml-auto text-xs">✓</span>}
+                        <FolderPlus size={14} className="mr-2" />
+                        Create folder
                       </DropdownMenuItem>
-                    )
-                  })}
+                    </>
+                  )}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}
@@ -219,6 +244,14 @@ export default function BookmarkCard({
         </DropdownMenu>
       </div>
       </article>
+
+      <CreateFolderDialog
+        open={createFolderOpen}
+        onOpenChange={setCreateFolderOpen}
+        onCreated={(folderId) => {
+          onAddToFolder?.(id, folderId)
+        }}
+      />
     </div>
   )
 }

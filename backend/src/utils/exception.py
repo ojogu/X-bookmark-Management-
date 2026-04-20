@@ -18,6 +18,7 @@ from src.v1.base.exception import (
     BadRequest,
     NotVerified,
     EmailVerificationError,
+    Unauthorized,
     DatabaseError,
     ServerError,
     NotActive,
@@ -78,6 +79,19 @@ def register_error_handlers(app: FastAPI):
                 "status": "error",
                 "message": "Resource already in use",
                 "error_code": "resource_in_use",
+                "data": None,
+                "role": None,
+            },
+        ),
+    )
+    app.add_exception_handler(
+        Unauthorized,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_detail={
+                "status": "error",
+                "message": "Unauthorized",
+                "error_code": "unauthorized_user",
                 "data": None,
                 "role": None,
             },

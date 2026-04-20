@@ -5,7 +5,7 @@ from src.utils.log import get_logger
 from src.v1.model.users import User
 from src.v1.service.tag import TagService
 from src.v1.route.dependencies import get_current_user, get_tag_service
-from src.v1.schemas import CreateTagRequest, UpdateTagRequest
+from src.v1.schema import CreateTagRequest, UpdateTagRequest
 from uuid import UUID
 
 logger = get_logger(__name__)

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import BookmarkFeed from '@/components/bookmarks/BookmarkFeed'
+import BookmarkToolbar from '@/components/bookmarks/BookmarkToolbar'
 import { Button } from '@/components/ui/button'
 import {
   useFolderBookmarks,
@@ -12,20 +13,37 @@ import {
   useTags,
   useAddTagToBookmark,
   useRemoveTagFromBookmark,
+  useAddBookmarkToFolder,
+  useRemoveBookmarkFromFolder,
 } from '@/features/bookmarks/hooks'
+import { useDebounce } from '@/hooks/useDebounce'
+import type { SortOption, FilterState } from '@/types'
 
 export default function FolderPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<SortOption>('date-desc')
+  const [filter, setFilter] = useState<FilterState>({ tagIds: [] })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
-  const { data, isLoading, isError, isFetching } = useFolderBookmarks(id ?? '', page)
+
+  const debouncedSearch = useDebounce(search, 350)
+
+  const { data, isLoading, isError, isFetching } = useFolderBookmarks(id ?? '', {
+    page,
+    search: debouncedSearch,
+    sort,
+    filter,
+  })
   const { data: foldersData } = useFolders()
   const { data: tagsData } = useTags()
   const deleteMutation = useDeleteBookmark()
   const markAsReadMutation = useMarkAsRead()
   const addTagMutation = useAddTagToBookmark()
   const removeTagMutation = useRemoveTagFromBookmark()
+  const addToFolderMutation = useAddBookmarkToFolder()
+  const removeFromFolderMutation = useRemoveBookmarkFromFolder()
 
   async function handleDelete(bookmarkId: string) {
     setDeletingId(bookmarkId)
@@ -48,6 +66,29 @@ export default function FolderPage() {
     await removeTagMutation.mutateAsync({ bookmarkId, tagId })
   }
 
+  async function handleAddToFolder(bookmarkId: string, folderId: string) {
+    await addToFolderMutation.mutateAsync({ bookmarkId, folderId })
+  }
+
+  async function handleRemoveFromFolder(bookmarkId: string, folderId: string) {
+    await removeFromFolderMutation.mutateAsync({ bookmarkId, folderId })
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value)
+    setPage(0)
+  }
+
+  function handleSortChange(value: SortOption) {
+    setSort(value)
+    setPage(0)
+  }
+
+  function handleFilterChange(value: FilterState) {
+    setFilter(value)
+    setPage(0)
+  }
+
   const hasMore = data?.pagination.hasMore ?? false
 
   return (
@@ -66,21 +107,36 @@ export default function FolderPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-        <BookmarkFeed
-          bookmarks={data?.data}
-          isLoading={isLoading}
-          isError={isError}
-          onDelete={handleDelete}
-          onToggleRead={handleToggleRead}
-          onAddTag={handleAddTag}
-          onRemoveTag={handleRemoveTag}
-          availableFolders={foldersData}
+        <BookmarkToolbar
+          search={search}
+          onSearchChange={handleSearchChange}
+          sort={sort}
+          onSortChange={handleSortChange}
+          filter={filter}
+          onFilterChange={handleFilterChange}
           availableTags={tagsData}
-          deletingId={deletingId}
-          emptyMessage="This folder is empty"
-          emptyDescription="Move bookmarks here to organize them."
-          onAddBookmark={() => navigate('/dashboard')}
+          totalCount={data?.pagination.total}
         />
+
+        <div className="mt-6">
+          <BookmarkFeed
+            bookmarks={data?.data}
+            isLoading={isLoading}
+            isError={isError}
+            onDelete={handleDelete}
+            onToggleRead={handleToggleRead}
+            onAddToFolder={handleAddToFolder}
+            onRemoveFromFolder={handleRemoveFromFolder}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            availableFolders={foldersData}
+            availableTags={tagsData}
+            deletingId={deletingId}
+            emptyMessage="This folder is empty"
+            emptyDescription="Move bookmarks here to organize them."
+            onAddBookmark={() => navigate('/dashboard')}
+          />
+        </div>
 
         {hasMore && (
           <div className="mt-6 flex justify-center">

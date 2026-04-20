@@ -257,12 +257,30 @@ export function useFolders() {
   })
 }
 
-export function useFolderBookmarks(folderId: string, page: number = 0) {
+export function useFolderBookmarks(
+  folderId: string,
+  options: {
+    page?: number
+    search?: string
+    sort?: SortOption
+    filter?: FilterState
+  } = {}
+) {
+  const { page = 0, search = '', sort = 'date-desc', filter = { tagIds: [] } } = options
+
   return useQuery({
     queryKey: bookmarkKeys.folder(folderId),
     queryFn: async () => {
       const limit = 20
       const offset = page * limit
+      const params = new URLSearchParams()
+      params.set('folder_id', folderId)
+      params.set('limit', String(limit))
+      params.set('offset', String(offset))
+      if (search) params.set('search', search)
+      if (sort) params.set('sort', sort)
+      if (filter.tagIds.length) params.set('tags', filter.tagIds.join(','))
+
       const res = await client.get<{
         data: Array<{
           id: string
@@ -281,7 +299,7 @@ export function useFolderBookmarks(folderId: string, page: number = 0) {
           }>
         }
         meta: { result_count: number; total_count: number; next_token: string | null }
-      }>(`/client/bookmarks?folder_id=${folderId}&limit=${limit}&offset=${offset}`)
+      }>(`/client/bookmarks?${params}`)
 
       const response = res.data
 
