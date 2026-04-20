@@ -11,10 +11,26 @@ from fastapi.security import (
     OAuth2PasswordBearer,
 )
 from src.v1.base.exception import InvalidToken
-
+import bcrypt
 from src.utils.log import get_logger
 
+
 logger = get_logger(__name__)
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+
+def verify_password_value(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        return False
 
 
 def encryption_key():
