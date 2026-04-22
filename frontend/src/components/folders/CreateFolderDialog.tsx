@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 import { useCreateFolder } from '@/features/bookmarks/hooks'
 
 interface CreateFolderDialogProps {
@@ -33,7 +34,7 @@ export function CreateFolderDialog({
       onOpenChange(false)
       onCreated?.(folder.id)
     } catch {
-      // Error handling
+      toast.error('Failed to create folder')
     }
   }
 

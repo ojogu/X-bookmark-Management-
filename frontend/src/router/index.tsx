@@ -11,6 +11,7 @@ import UnreadPage from '@/pages/UnreadPage'
 import FoldersPage from '@/pages/FoldersPage'
 import FolderPage from '@/pages/FolderPage'
 import TagsPage from '@/pages/TagsPage'
+import TagPage from '@/pages/TagPage'
 import ProfilePage from '@/pages/ProfilePage'
 import AdminOverview from '@/pages/admin/AdminOverview'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
@@ -41,6 +42,7 @@ export default function Router() {
           <Route path="folders" element={<FoldersPage />} />
           <Route path="folders/:id" element={<FolderPage />} />
           <Route path="tags" element={<TagsPage />} />
+          <Route path="tags/:name" element={<TagPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
 

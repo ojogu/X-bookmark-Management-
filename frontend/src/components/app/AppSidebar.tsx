@@ -15,6 +15,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarSeparator,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import {
   Collapsible,
@@ -35,20 +36,24 @@ import {
   Tag,
   User,
 } from 'lucide-react'
-import { useProfile, useFolders, useUnreadBookmarks } from '@/features/bookmarks/hooks'
+import { useProfile, useFolders, useTags, useUnreadBookmarks } from '@/features/bookmarks/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Wordmark } from '@/components/common/Wordmark'
 import { CreateFolderDialog } from '@/components/folders/CreateFolderDialog'
+import { CreateTagDialog } from '@/components/tags/CreateTagDialog'
 
 export default function AppSidebar() {
   const location = useLocation()
   const { logout } = useAuth()
   const { data: profile } = useProfile()
   const { data: folders } = useFolders()
+  const { data: tags } = useTags()
   const { data: unread } = useUnreadBookmarks()
   const { theme, setTheme } = useTheme()
+  const { closeSidebar } = useSidebar()
   const [createFolderOpen, setCreateFolderOpen] = useState(false)
+  const [createTagOpen, setCreateTagOpen] = useState(false)
 
   const unreadCount = unread?.data?.length ?? 0
 
@@ -77,6 +82,7 @@ export default function AppSidebar() {
             <div className="px-4 py-3">
               <NavLink
                 to="/dashboard/profile"
+                onClick={closeSidebar}
                 className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-sidebar-accent"
               >
                 <Avatar className="h-8 w-8 shrink-0">
@@ -108,7 +114,7 @@ export default function AppSidebar() {
                   isActive={isActive('/dashboard', true)}
                   tooltip="All Bookmarks"
                 >
-                  <NavLink to="/dashboard" end>
+                  <NavLink to="/dashboard" end onClick={closeSidebar}>
                     <Bookmark size={16} />
                     <span>All Bookmarks</span>
                   </NavLink>
@@ -122,7 +128,7 @@ export default function AppSidebar() {
                   isActive={isActive('/dashboard/unread')}
                   tooltip="Unread"
                 >
-                  <NavLink to="/dashboard/unread">
+                  <NavLink to="/dashboard/unread" onClick={closeSidebar}>
                     <BookmarkCheck size={16} />
                     <span>Unread</span>
                   </NavLink>
@@ -166,7 +172,7 @@ export default function AppSidebar() {
                               asChild
                               isActive={location.pathname === `/dashboard/folders/${folder.id}`}
                             >
-                              <NavLink to={`/dashboard/folders/${folder.id}`}>
+                              <NavLink to={`/dashboard/folders/${folder.id}`} onClick={closeSidebar}>
                                 <span className="flex-1 truncate">{folder.name}</span>
                                 <span className="text-xs text-muted-foreground dark:text-text-muted">{folder.bookmarkCount}</span>
                               </NavLink>
@@ -186,7 +192,7 @@ export default function AppSidebar() {
                     ) : (
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
-                          <NavLink to="/dashboard/folders">
+                          <NavLink to="/dashboard/folders" onClick={closeSidebar}>
                             <span className="text-muted-foreground dark:text-text-muted">Manage folders</span>
                           </NavLink>
                         </SidebarMenuSubButton>
@@ -196,19 +202,69 @@ export default function AppSidebar() {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Tags */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive('/dashboard/tags')}
-                  tooltip="Tags"
-                >
-                  <NavLink to="/dashboard/tags">
-                    <Tag size={16} />
-                    <span>Tags</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {/* Tags — collapsible */}
+              <Collapsible defaultOpen={isActive('/dashboard/tags')}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={isActive('/dashboard/tags')}
+                      tooltip="Tags"
+                    >
+                      <Tag size={16} />
+                      <span>Tags</span>
+                      <ChevronRight
+                        size={14}
+                        className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                      />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                </SidebarMenuItem>
+
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {tags && tags.length > 0 ? (
+                      <>
+                        {tags.map((tag) => (
+                          <SidebarMenuSubItem key={tag.id}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location.pathname === `/dashboard/tags/${tag.name}`}
+                            >
+                              <NavLink to={`/dashboard/tags/${tag.name}`} onClick={closeSidebar}>
+                                <span
+                                  className="flex h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: tag.color || '#6b7280' }}
+                                />
+                                <span className="flex-1 truncate">#{tag.name}</span>
+                                {tag.bookmarkCount !== undefined && (
+                                  <span className="text-xs text-muted-foreground dark:text-text-muted">{tag.bookmarkCount}</span>
+                                )}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            onClick={() => setCreateTagOpen(true)}
+                            className="text-muted-foreground dark:text-text-muted hover:text-foreground dark:hover:text-foreground"
+                          >
+                            <Tag size={14} />
+                            <span>Create Tag</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </>
+                    ) : (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <NavLink to="/dashboard/tags" onClick={closeSidebar}>
+                            <span className="text-muted-foreground dark:text-text-muted">Manage tags</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -223,7 +279,7 @@ export default function AppSidebar() {
               isActive={isActive('/dashboard/profile')}
               tooltip="Profile"
             >
-              <NavLink to="/dashboard/profile">
+              <NavLink to="/dashboard/profile" onClick={closeSidebar}>
                 <User size={16} />
                 <span>Profile</span>
               </NavLink>
@@ -241,6 +297,10 @@ export default function AppSidebar() {
       <CreateFolderDialog
         open={createFolderOpen}
         onOpenChange={setCreateFolderOpen}
+      />
+      <CreateTagDialog
+        open={createTagOpen}
+        onOpenChange={setCreateTagOpen}
       />
     </Sidebar>
   )

@@ -53,6 +53,20 @@ async def update_folder(
     return folder
 
 
+@folder_router.get("/{folder_id}")
+async def get_folder(
+    folder_id: str,
+    current_user: User = Depends(get_current_user),
+    folder_service: FolderService = Depends(get_folder_service),
+    db: AsyncSession = Depends(get_session),
+):
+    """Get a single folder by ID."""
+    user_id = current_user.id
+    folder_uuid = UUID(folder_id)
+    folder = await folder_service.get_folder(db, user_id, folder_uuid)
+    return folder
+
+
 @folder_router.delete("/{folder_id}")
 async def delete_folder(
     folder_id: str,

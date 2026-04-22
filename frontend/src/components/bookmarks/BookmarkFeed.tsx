@@ -22,6 +22,10 @@ interface BookmarkFeedProps {
   emptyDescription?: string
   onAddBookmark?: () => void
   onCreateFolder?: (callback: (folderId: string) => void) => void
+  inFolderContext?: boolean
+  currentFolderId?: string
+  inTagContext?: boolean
+  currentTagId?: string
 }
 
 function SkeletonCard() {
@@ -62,6 +66,10 @@ export default function BookmarkFeed({
   emptyDescription = 'Try adjusting your search or filters.',
   onAddBookmark,
   onCreateFolder,
+  inFolderContext = false,
+  currentFolderId,
+  inTagContext = false,
+  currentTagId,
 }: BookmarkFeedProps) {
   if (isLoading) {
     return (
@@ -132,6 +140,10 @@ export default function BookmarkFeed({
           bookmarkFolders={bookmarkFoldersMap[bookmark.id] || []}
           isDeleting={deletingId === bookmark.id}
           onCreateFolder={onCreateFolder}
+          inFolderContext={inFolderContext}
+          currentFolderId={currentFolderId}
+          inTagContext={inTagContext}
+          currentTagId={currentTagId}
         />
       ))}
     </div>

@@ -173,3 +173,42 @@ class FolderService:
 
         logger.info(f"Deleted folder {folder_id}")
         return True
+
+    async def get_folder(
+        self, db: AsyncSession, user_id: UUID, folder_id: UUID
+    ) -> Dict[str, Any]:
+        """
+        Get a single folder by ID with bookmark count.
+
+        Args:
+            db: SQLAlchemy session
+            user_id: The user's ID
+            folder_id: The folder's ID
+
+        Returns:
+            Folder object with bookmark count
+        """
+        logger.info(f"Fetching folder {folder_id} for user_id={user_id}")
+
+        result = await db.execute(
+            sa.select(FolderModel).where(
+                FolderModel.id == folder_id, FolderModel.user_id == user_id
+            )
+        )
+        folder = result.scalar_one_or_none()
+        if not folder:
+            raise NotFoundError(f"Folder not found")
+
+        count_result = await db.execute(
+            sa.select(sa.func.count(bookmark_folders.c.bookmark_id)).where(
+                bookmark_folders.c.folder_id == folder.id
+            )
+        )
+        bookmark_count = count_result.scalar() or 0
+
+        logger.info(f"Found folder {folder_id} with {bookmark_count} bookmarks")
+        return {
+            "id": str(folder.id),
+            "name": folder.name,
+            "bookmarkCount": bookmark_count,
+        }

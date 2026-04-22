@@ -253,8 +253,15 @@ class BookmarkService:
             folder_uuid = UUID(folder_id)
             query = query.join(
                 bookmark_folders,
-                BookmarkModel.post_id == bookmark_folders.c.bookmark_id,
+                BookmarkModel.id == bookmark_folders.c.bookmark_id,
             ).where(bookmark_folders.c.folder_id == folder_uuid)
+
+        if tag_ids:
+            tag_uuids = [UUID(tid) for tid in tag_ids]
+            query = query.join(
+                bookmark_tags,
+                BookmarkModel.id == bookmark_tags.c.bookmark_id,
+            ).where(bookmark_tags.c.tag_id.in_(tag_uuids))
 
         if sort == "date-asc":
             query = query.order_by(PostModel.created_at_from_twitter.asc())
@@ -274,6 +281,27 @@ class BookmarkService:
             logger.info(f"No bookmarks found for user_id={user_id}")
             return {"data": [], "includes": {"users": []}, "meta": {"result_count": 0}}
 
+        bookmark_ids = [bookmark.id for bookmark, post, author in rows]
+
+        tags_query = (
+            sa.select(bookmark_tags.c.bookmark_id, TagModel)
+            .join(TagModel, bookmark_tags.c.tag_id == TagModel.id)
+            .where(bookmark_tags.c.bookmark_id.in_(bookmark_ids))
+        )
+        tags_result = await db.execute(tags_query)
+        tags_rows = tags_result.all()
+
+        bookmark_tags_map: Dict[str, List[Dict[str, Any]]] = {}
+        for bookmark_id, tag in tags_rows:
+            tag_dict = {
+                "id": str(tag.id),
+                "name": tag.name,
+                "color": tag.color,
+            }
+            if str(bookmark_id) not in bookmark_tags_map:
+                bookmark_tags_map[str(bookmark_id)] = []
+            bookmark_tags_map[str(bookmark_id)].append(tag_dict)
+
         data = []
         users_map = {}
 
@@ -290,6 +318,7 @@ class BookmarkService:
             data.append(
                 {
                     "id": post.post_id,
+                    "bookmark_id": str(bookmark.id),
                     "text": post.text,
                     "author_id": author_x_id,
                     "created_at": (
@@ -307,6 +336,7 @@ class BookmarkService:
                     },
                     "lang": post.lang,
                     "possibly_sensitive": post.possibly_sensitive,
+                    "tags": bookmark_tags_map.get(str(bookmark.id), []),
                 }
             )
 
@@ -708,7 +738,7 @@ class BookmarkService:
             return False
 
     async def add_bookmark_to_folder(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str, folder_id: UUID
+        self, db: AsyncSession, user_id: UUID, bookmark_id: UUID, folder_id: UUID
     ) -> bool:
         """
         Add a bookmark to a folder.
@@ -716,25 +746,18 @@ class BookmarkService:
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
             folder_id: The folder's ID
 
         Returns:
             True if added
         """
-        logger.info(f"Adding bookmark {tweet_id} to folder {folder_id}")
-
-        result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
-        )
-        post = result.scalar_one_or_none()
-
-        if not post:
-            raise NotFoundError(f"Post not found")
+        logger.info(f"Adding bookmark {bookmark_id} to folder {folder_id}")
 
         result = await db.execute(
             sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+                BookmarkModel.id == bookmark_id,
+                BookmarkModel.user_id == user_id,
             )
         )
         bookmark = result.scalar_one_or_none()
@@ -765,7 +788,7 @@ class BookmarkService:
         return True
 
     async def remove_bookmark_from_folder(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str, folder_id: UUID
+        self, db: AsyncSession, user_id: UUID, bookmark_id: UUID, folder_id: UUID
     ) -> bool:
         """
         Remove a bookmark from a folder.
@@ -773,25 +796,18 @@ class BookmarkService:
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
             folder_id: The folder's ID
 
         Returns:
             True if removed
         """
-        logger.info(f"Removing bookmark {tweet_id} from folder {folder_id}")
-
-        result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
-        )
-        post = result.scalar_one_or_none()
-
-        if not post:
-            raise NotFoundError(f"Post not found")
+        logger.info(f"Removing bookmark {bookmark_id} from folder {folder_id}")
 
         result = await db.execute(
             sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+                BookmarkModel.id == bookmark_id,
+                BookmarkModel.user_id == user_id,
             )
         )
         bookmark = result.scalar_one_or_none()
@@ -811,32 +827,25 @@ class BookmarkService:
         return True
 
     async def get_bookmark_folders(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str
+        self, db: AsyncSession, user_id: UUID, bookmark_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Get folders that contain a bookmark.
+        Get folders containing a bookmark.
 
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
 
         Returns:
             List of folder objects
         """
-        logger.info(f"Getting folders for bookmark {tweet_id}")
-
-        result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
-        )
-        post = result.scalar_one_or_none()
-
-        if not post:
-            return []
+        logger.info(f"Getting folders for bookmark {bookmark_id}")
 
         result = await db.execute(
             sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+                BookmarkModel.id == UUID(bookmark_id),
+                BookmarkModel.user_id == user_id,
             )
         )
         bookmark = result.scalar_one_or_none()
@@ -863,7 +872,7 @@ class BookmarkService:
         return folder_list
 
     async def add_tag_to_bookmark(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str, tag_id: UUID
+        self, db: AsyncSession, user_id: UUID, bookmark_id: UUID, tag_id: UUID
     ) -> bool:
         """
         Add a tag to a bookmark.
@@ -871,21 +880,24 @@ class BookmarkService:
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
             tag_id: The tag's ID
 
         Returns:
             True if added
         """
-        logger.info(f"Adding tag {tag_id} to bookmark {tweet_id}")
+        logger.info(f"Adding tag {tag_id} to bookmark {bookmark_id}")
 
         result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
+            sa.select(BookmarkModel).where(
+                BookmarkModel.id == bookmark_id,
+                BookmarkModel.user_id == user_id,
+            )
         )
-        post = result.scalar_one_or_none()
+        bookmark = result.scalar_one_or_none()
 
-        if not post:
-            raise NotFoundError(f"Post not found")
+        if not bookmark:
+            raise NotFoundError(f"Bookmark not found")
 
         result = await db.execute(
             sa.select(TagModel).where(
@@ -896,16 +908,6 @@ class BookmarkService:
 
         if not tag:
             raise NotFoundError(f"Tag not found")
-
-        result = await db.execute(
-            sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
-            )
-        )
-        bookmark = result.scalar_one_or_none()
-
-        if not bookmark:
-            raise NotFoundError(f"Bookmark not found")
 
         result = await db.execute(
             sa.select(bookmark_tags).where(
@@ -928,7 +930,7 @@ class BookmarkService:
         return True
 
     async def remove_tag_from_bookmark(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str, tag_id: UUID
+        self, db: AsyncSession, user_id: UUID, bookmark_id: UUID, tag_id: UUID
     ) -> bool:
         """
         Remove a tag from a bookmark.
@@ -936,21 +938,24 @@ class BookmarkService:
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
             tag_id: The tag's ID
 
         Returns:
             True if removed
         """
-        logger.info(f"Removing tag {tag_id} from bookmark {tweet_id}")
+        logger.info(f"Removing tag {tag_id} from bookmark {bookmark_id}")
 
         result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
+            sa.select(BookmarkModel).where(
+                BookmarkModel.id == bookmark_id,
+                BookmarkModel.user_id == user_id,
+            )
         )
-        post = result.scalar_one_or_none()
+        bookmark = result.scalar_one_or_none()
 
-        if not post:
-            raise NotFoundError(f"Post not found")
+        if not bookmark:
+            raise NotFoundError(f"Bookmark not found")
 
         result = await db.execute(
             sa.select(TagModel).where(
@@ -961,16 +966,6 @@ class BookmarkService:
 
         if not tag:
             raise NotFoundError(f"Tag not found")
-
-        result = await db.execute(
-            sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
-            )
-        )
-        bookmark = result.scalar_one_or_none()
-
-        if not bookmark:
-            raise NotFoundError(f"Bookmark not found")
 
         await db.execute(
             bookmark_tags.delete().where(
@@ -984,7 +979,7 @@ class BookmarkService:
         return True
 
     async def get_bookmark_tags(
-        self, db: AsyncSession, user_id: UUID, tweet_id: str
+        self, db: AsyncSession, user_id: UUID, bookmark_id: str
     ) -> List[Dict[str, Any]]:
         """
         Get tags for a bookmark.
@@ -992,24 +987,17 @@ class BookmarkService:
         Args:
             db: SQLAlchemy session
             user_id: The user's ID
-            tweet_id: The tweet/post ID
+            bookmark_id: The bookmark's ID
 
         Returns:
             List of tag objects
         """
-        logger.info(f"Getting tags for bookmark {tweet_id}")
-
-        result = await db.execute(
-            sa.select(PostModel).where(PostModel.post_id == tweet_id)
-        )
-        post = result.scalar_one_or_none()
-
-        if not post:
-            return []
+        logger.info(f"Getting tags for bookmark {bookmark_id}")
 
         result = await db.execute(
             sa.select(BookmarkModel).where(
-                BookmarkModel.user_id == user_id, BookmarkModel.post_id == post.id
+                BookmarkModel.id == UUID(bookmark_id),
+                BookmarkModel.user_id == user_id,
             )
         )
         bookmark = result.scalar_one_or_none()

@@ -6,6 +6,7 @@ from src.v1.model.users import User
 from src.v1.service.tag import TagService
 from src.v1.route.dependencies import get_current_user, get_tag_service
 from src.v1.schema import CreateTagRequest, UpdateTagRequest
+from src.v1.base.exception import NotFoundError
 from uuid import UUID
 
 logger = get_logger(__name__)
@@ -23,6 +24,21 @@ async def get_tags(
     user_id = current_user.id
     tags = await tag_service.get_tags(db, user_id)
     return tags
+
+
+@tag_router.get("/name/{name}")
+async def get_tag_by_name(
+    name: str,
+    current_user: User = Depends(get_current_user),
+    tag_service: TagService = Depends(get_tag_service),
+    db: AsyncSession = Depends(get_session),
+):
+    """Get a tag by name."""
+    user_id = current_user.id
+    tag = await tag_service.get_tag_by_name(db, user_id, name)
+    if not tag:
+        raise NotFoundError(f"Tag '{name}' not found")
+    return tag
 
 
 @tag_router.post("")

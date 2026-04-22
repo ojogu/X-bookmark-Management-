@@ -11,7 +11,7 @@ export interface Tag {
   name: string
   color?: string
   source?: 'user' | 'x'
-  bookmarkCount: number
+  bookmarkCount?: number
 }
 
 export interface Folder {

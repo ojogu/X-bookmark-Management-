@@ -20,6 +20,7 @@ export const bookmarkKeys = {
   unread: () => [...bookmarkKeys.all, 'unread'] as const,
   folders: ['folders'] as const,
   folder: (id: string) => [...bookmarkKeys.folders, id] as const,
+  folderDetail: (id: string) => [...bookmarkKeys.folders, 'detail', id] as const,
   tags: ['tags'] as const,
   profile: ['profile'] as const,
 }
@@ -51,11 +52,13 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
       const res = await client.get<{
         data: Array<{
           id: string
+          bookmark_id: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
+          tags: Array<{ id: string; name: string; color?: string }>
         }>
         includes: {
           users: Array<{
@@ -76,7 +79,7 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
         return {
-          id: bookmark.id,
+          id: bookmark.bookmark_id,
           tweetId: bookmark.id,
           text: bookmark.text,
           author: {
@@ -88,7 +91,7 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
           },
           savedAt: bookmark.created_at,
           isRead: false,
-          tags: [],
+          tags: bookmark.tags || [],
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
@@ -118,11 +121,13 @@ export function useUnreadBookmarks(page: number = 0) {
       const res = await client.get<{
         data: Array<{
           id: string
+          bookmark_id: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
+          tags: Array<{ id: string; name: string; color?: string }>
         }>
         includes: {
           users: Array<{
@@ -143,7 +148,7 @@ export function useUnreadBookmarks(page: number = 0) {
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
         return {
-          id: bookmark.id,
+          id: bookmark.bookmark_id,
           tweetId: bookmark.id,
           text: bookmark.text,
           author: {
@@ -155,7 +160,7 @@ export function useUnreadBookmarks(page: number = 0) {
           },
           savedAt: bookmark.created_at,
           isRead: false,
-          tags: [],
+          tags: bookmark.tags || [],
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
@@ -247,8 +252,19 @@ export function useMarkAsRead() {
 }
 
 // ── Folders ───────────────────────────────────────────────────────
-export function useFolders() {
+export function useFolder(folderId: string) {
   return useQuery({
+    queryKey: bookmarkKeys.folderDetail(folderId),
+    queryFn: async () => {
+      const res = await client.get<Folder>(`/client/folders/${folderId}`)
+      return res.data
+    },
+    enabled: !!folderId,
+  })
+}
+
+export function useFolders() {
+  return useQuery<Folder[]>({
     queryKey: bookmarkKeys.folders,
     queryFn: async () => {
       const res = await client.get<Folder[]>('/client/folders')
@@ -284,11 +300,13 @@ export function useFolderBookmarks(
       const res = await client.get<{
         data: Array<{
           id: string
+          bookmark_id: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
+          tags: Array<{ id: string; name: string; color?: string }>
         }>
         includes: {
           users: Array<{
@@ -309,7 +327,7 @@ export function useFolderBookmarks(
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
         return {
-          id: bookmark.id,
+          id: bookmark.bookmark_id,
           tweetId: bookmark.id,
           text: bookmark.text,
           author: {
@@ -321,7 +339,7 @@ export function useFolderBookmarks(
           },
           savedAt: bookmark.created_at,
           isRead: false,
-          tags: [],
+          tags: bookmark.tags || [],
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
@@ -386,12 +404,34 @@ export function useDeleteFolder() {
 
 // ── Tags ──────────────────────────────────────────────────────────
 export function useTags() {
-  return useQuery({
+  return useQuery<Tag[]>({
     queryKey: bookmarkKeys.tags,
     queryFn: async () => {
       const res = await client.get<Tag[]>('/client/tags')
       return res.data
     },
+  })
+}
+
+export function useTag(tagId: string) {
+  return useQuery<Tag>({
+    queryKey: [...bookmarkKeys.tags, tagId],
+    queryFn: async () => {
+      const res = await client.get<Tag>(`/client/tags/${tagId}`)
+      return res.data
+    },
+    enabled: !!tagId,
+  })
+}
+
+export function useTagByName(name: string) {
+  return useQuery<Tag>({
+    queryKey: [...bookmarkKeys.tags, 'name', name],
+    queryFn: async () => {
+      const res = await client.get<Tag>(`/client/tags/name/${name}`)
+      return res.data
+    },
+    enabled: !!name,
   })
 }
 

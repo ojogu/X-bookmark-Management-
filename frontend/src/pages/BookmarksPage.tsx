@@ -3,6 +3,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import BookmarkFeed from '@/components/bookmarks/BookmarkFeed'
 import BookmarkToolbar from '@/components/bookmarks/BookmarkToolbar'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import {
   useBookmarks,
   useDeleteBookmark,
@@ -45,6 +46,9 @@ export default function BookmarksPage() {
     setDeletingId(id)
     try {
       await deleteMutation.mutateAsync(id)
+      toast.success('Bookmark deleted')
+    } catch {
+      toast.error('Failed to delete bookmark')
     } finally {
       setDeletingId(null)
     }
@@ -55,11 +59,21 @@ export default function BookmarksPage() {
   }
 
   async function handleAddToFolder(bookmarkId: string, folderId: string) {
-    await addToFolderMutation.mutateAsync({ bookmarkId, folderId })
+    try {
+      await addToFolderMutation.mutateAsync({ bookmarkId, folderId })
+      toast.success('Added to folder')
+    } catch {
+      toast.error('Failed to add to folder')
+    }
   }
 
   async function handleRemoveFromFolder(bookmarkId: string, folderId: string) {
-    await removeFromFolderMutation.mutateAsync({ bookmarkId, folderId })
+    try {
+      await removeFromFolderMutation.mutateAsync({ bookmarkId, folderId })
+      toast.success('Removed from folder')
+    } catch {
+      toast.error('Failed to remove from folder')
+    }
   }
 
   async function handleAddTag(bookmarkId: string, tagId: string) {

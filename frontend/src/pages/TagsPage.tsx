@@ -1,15 +1,23 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Tag, Plus, Trash2, X } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import { useTags, useCreateTag, useDeleteTag } from '@/features/bookmarks/hooks'
 import type { Tag as TagType } from '@/types'
+
+const TAG_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e',
+  '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
+]
 
 export default function TagsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5])
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const { data: tags, isLoading, isError } = useTags()
@@ -19,11 +27,13 @@ export default function TagsPage() {
   async function handleCreateTag() {
     if (!newTagName.trim()) return
     try {
-      await createTag.mutateAsync({ name: newTagName.trim() })
+      await createTag.mutateAsync({ name: newTagName.trim(), color: newTagColor })
       setNewTagName('')
+      setNewTagColor(TAG_COLORS[5])
       setIsCreating(false)
-    } catch (e) {
-      // Error handling
+      toast.success('Tag created')
+    } catch {
+      toast.error('Failed to create tag')
     }
   }
 
@@ -31,6 +41,9 @@ export default function TagsPage() {
     setDeletingId(id)
     try {
       await deleteTag.mutateAsync(id)
+      toast.success('Tag deleted')
+    } catch {
+      toast.error('Failed to delete tag')
     } finally {
       setDeletingId(null)
     }
@@ -47,32 +60,47 @@ export default function TagsPage() {
         {/* Create tag section */}
         <div className="mb-6">
           {isCreating ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="Tag name"
-                className="h-9 max-w-xs border-border-subtle bg-bg-subtle"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
-                autoFocus
-              />
-              <Button
-                size="sm"
-                onClick={handleCreateTag}
-                disabled={!newTagName.trim() || createTag.isPending}
-              >
-                Create
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setIsCreating(false)
-                  setNewTagName('')
-                }}
-              >
-                <X size={14} />
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  placeholder="Tag name"
+                  className="h-9 max-w-xs border-border-subtle bg-bg-subtle"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={handleCreateTag}
+                  disabled={!newTagName.trim() || createTag.isPending}
+                >
+                  Create
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsCreating(false)
+                    setNewTagName('')
+                  }}
+                >
+                  <X size={14} />
+                </Button>
+              </div>
+              <div className="flex gap-1.5">
+                {TAG_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setNewTagColor(c)}
+                    className={`h-5 w-5 rounded-full transition-transform ${
+                      newTagColor === c ? 'scale-125 ring-2 ring-offset-1 ring-black dark:ring-white' : 'hover:scale-110'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <Button
@@ -114,25 +142,33 @@ export default function TagsPage() {
         {tags && tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag: TagType) => (
-              <div
+              <Link
                 key={tag.id}
+                to={`/dashboard/tags/${tag.name}`}
                 className={`group flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1.5 text-sm text-text-secondary transition-colors hover:border-border-strong ${
                   deletingId === tag.id ? 'pointer-events-none opacity-50' : ''
                 }`}
               >
-                <Tag size={11} />
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: tag.color || '#6b7280' }}
+                />
                 <span>#{tag.name}</span>
                 <span className="text-xs text-text-muted">{tag.bookmarkCount}</span>
                 {tag.source === 'user' && (
                   <button
-                    onClick={() => handleDeleteTag(tag.id)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleDeleteTag(tag.id)
+                    }}
                     className="ml-1 flex h-4 w-4 items-center justify-center rounded text-text-muted opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                     title="Delete tag"
                   >
                     <Trash2 size={10} />
                   </button>
                 )}
-              </div>
+              </Link>
             ))}
           </div>
         )}

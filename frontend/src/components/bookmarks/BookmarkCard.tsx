@@ -29,6 +29,10 @@ interface BookmarkCardProps {
   bookmarkFolders?: string[]
   isDeleting?: boolean
   onCreateFolder?: (callback: (folderId: string) => void) => void
+  inFolderContext?: boolean
+  currentFolderId?: string
+  inTagContext?: boolean
+  currentTagId?: string
 }
 
 const openTweet = (tweetId: string) => {
@@ -55,14 +59,18 @@ export default function BookmarkCard({
   bookmarkFolders = [],
   isDeleting,
   onCreateFolder,
+  inFolderContext = false,
+  currentFolderId,
+  inTagContext = false,
+  currentTagId,
 }: BookmarkCardProps) {
-  const { id, author, text, savedAt, tags, faviconUrl, isRead } = bookmark
+  const { id, tweetId, author, text, savedAt, tags, faviconUrl, isRead } = bookmark
   const [open, setOpen] = useState(false)
   const [createFolderOpen, setCreateFolderOpen] = useState(false)
 
   return (
     <div
-      onClick={() => openTweet(id)}
+      onClick={() => openTweet(tweetId)}
       style={{ cursor: 'pointer' }}
     >
       <article
@@ -146,8 +154,20 @@ export default function BookmarkCard({
               </DropdownMenuItem>
             )}
 
-            {/* Add to folder submenu */}
-            {(onAddToFolder || onCreateFolder) && (
+            {/* Folder submenu or remove option */}
+            {inFolderContext && onRemoveFromFolder && currentFolderId ? (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRemoveFromFolder(id, currentFolderId)
+                  setOpen(false)
+                }}
+              >
+                <X size={14} className="mr-2" />
+                Remove from folder
+              </DropdownMenuItem>
+            ) : (onAddToFolder || onCreateFolder) && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <Folder size={14} className="mr-2" />
@@ -160,7 +180,9 @@ export default function BookmarkCard({
                       return (
                         <DropdownMenuItem
                           key={folder.id}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
                             if (isInFolder && onRemoveFromFolder) {
                               onRemoveFromFolder(id, folder.id)
                             } else {
@@ -184,7 +206,9 @@ export default function BookmarkCard({
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
                           setOpen(false)
                           setCreateFolderOpen(true)
                         }}
@@ -212,7 +236,9 @@ export default function BookmarkCard({
                     return (
                       <DropdownMenuItem
                         key={tag.id}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
                           if (hasTag && onRemoveTag) {
                             onRemoveTag(id, tag.id)
                           } else {
@@ -228,6 +254,21 @@ export default function BookmarkCard({
                   })}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+            )}
+
+            {/* Remove tag option in tag context */}
+            {inTagContext && onRemoveTag && currentTagId && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRemoveTag(id, currentTagId)
+                  setOpen(false)
+                }}
+              >
+                <X size={14} className="mr-2" />
+                Remove tag
+              </DropdownMenuItem>
             )}
 
             <DropdownMenuSeparator />

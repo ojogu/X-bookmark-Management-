@@ -5,6 +5,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import { useFolders, useCreateFolder, useDeleteFolder } from '@/features/bookmarks/hooks'
 import type { Folder as FolderType } from '@/types'
 
@@ -23,8 +24,9 @@ export default function FoldersPage() {
       await createFolder.mutateAsync(newFolderName.trim())
       setNewFolderName('')
       setIsCreating(false)
+      toast.success('Folder created')
     } catch {
-      // Error handling
+      toast.error('Failed to create folder')
     }
   }
 
@@ -32,6 +34,9 @@ export default function FoldersPage() {
     setDeletingId(id)
     try {
       await deleteFolder.mutateAsync(id)
+      toast.success('Folder deleted')
+    } catch {
+      toast.error('Failed to delete folder')
     } finally {
       setDeletingId(null)
     }

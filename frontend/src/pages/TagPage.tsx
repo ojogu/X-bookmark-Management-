@@ -8,8 +8,8 @@ import BookmarkToolbar from '@/components/bookmarks/BookmarkToolbar'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
-  useFolderBookmarks,
-  useFolder,
+  useBookmarks,
+  useTagByName,
   useDeleteBookmark,
   useMarkAsRead,
   useFolders,
@@ -18,13 +18,13 @@ import {
   useRemoveTagFromBookmark,
   useAddBookmarkToFolder,
   useRemoveBookmarkFromFolder,
-  useUpdateFolder,
+  useUpdateTag,
 } from '@/features/bookmarks/hooks'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { SortOption, FilterState } from '@/types'
 
-export default function FolderPage() {
-  const { id } = useParams<{ id: string }>()
+export default function TagPage() {
+  const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('date-desc')
@@ -37,13 +37,14 @@ export default function FolderPage() {
 
   const debouncedSearch = useDebounce(search, 350)
 
-  const { data: bookmarksData, isLoading, isError, isFetching } = useFolderBookmarks(id ?? '', {
-    page,
+  const { data: tagData } = useTagByName(name ?? '')
+
+  const { data: bookmarksData, isLoading, isError, isFetching } = useBookmarks({
     search: debouncedSearch,
     sort,
-    filter,
+    filter: { ...filter, tagIds: tagData?.id ? [tagData.id] : [] },
+    page,
   })
-  const { data: folderData } = useFolder(id ?? '')
   const { data: tagsData } = useTags()
   const { data: foldersData } = useFolders()
   const deleteMutation = useDeleteBookmark()
@@ -52,10 +53,11 @@ export default function FolderPage() {
   const removeTagMutation = useRemoveTagFromBookmark()
   const addToFolderMutation = useAddBookmarkToFolder()
   const removeFromFolderMutation = useRemoveBookmarkFromFolder()
-  const updateFolderMutation = useUpdateFolder()
+  const updateTagMutation = useUpdateTag()
 
-  const folderName = folderData?.name ?? 'Folder'
-  const bookmarkCount = folderData?.bookmarkCount ?? 0
+  const tagName = tagData?.name ?? 'Tag'
+  const tagColor = tagData?.color ?? '#6b7280'
+  const bookmarkCount = tagData?.bookmarkCount ?? 0
 
   async function handleDelete(bookmarkId: string) {
     setDeletingId(bookmarkId)
@@ -124,21 +126,21 @@ export default function FolderPage() {
   }, [isEditing])
 
   function handleStartEdit() {
-    setEditName(folderName)
+    setEditName(tagName)
     setIsEditing(true)
   }
 
   async function handleSaveEdit() {
-    if (!editName.trim() || editName === folderName) {
+    if (!editName.trim() || editName === tagName) {
       setIsEditing(false)
       return
     }
     try {
-      await updateFolderMutation.mutateAsync({ folderId: id!, name: editName.trim() })
-      toast.success('Folder renamed')
+      await updateTagMutation.mutateAsync({ tagId: tagData?.id!, name: editName.trim() })
+      toast.success('Tag renamed')
       setIsEditing(false)
     } catch {
-      toast.error('Failed to rename folder')
+      toast.error('Failed to rename tag')
     }
   }
 
@@ -160,11 +162,11 @@ export default function FolderPage() {
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border-subtle px-4 sm:px-6">
         <SidebarTrigger className="text-text-muted hover:text-text-primary" />
         <Link
-          to="/dashboard/folders"
+          to="/dashboard/tags"
           className="flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text-primary"
         >
           <ChevronLeft size={14} />
-          Folders
+          Tags
         </Link>
         <span className="text-border-subtle">/</span>
         {isEditing ? (
@@ -179,9 +181,13 @@ export default function FolderPage() {
         ) : (
           <h1
             onClick={handleStartEdit}
-            className="cursor-pointer font-serif italic text-lg text-text-primary hover:underline"
+            className="cursor-pointer flex items-center gap-2 font-serif italic text-lg text-text-primary hover:underline"
           >
-            {folderName}
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: tagColor }}
+            />
+            #{tagName}
           </h1>
         )}
       </header>
@@ -212,11 +218,11 @@ export default function FolderPage() {
             availableFolders={foldersData}
             availableTags={tagsData}
             deletingId={deletingId}
-            emptyMessage="This folder is empty"
-            emptyDescription="Move bookmarks here to organize them."
+            emptyMessage="No bookmarks with this tag"
+            emptyDescription="Add tags to bookmarks to see them here."
             onAddBookmark={() => navigate('/dashboard')}
-            inFolderContext={true}
-            currentFolderId={id}
+            inTagContext={true}
+            currentTagId={tagData?.id}
           />
         </div>
 

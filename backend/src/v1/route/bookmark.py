@@ -147,8 +147,11 @@ async def add_bookmark_to_folder(
     from uuid import UUID
 
     user_id = current_user.id
+    bookmark_uuid = UUID(bookmark_id)
     folder_uuid = UUID(request.folder_id)
-    await bookmark_service.add_bookmark_to_folder(db, user_id, bookmark_id, folder_uuid)
+    await bookmark_service.add_bookmark_to_folder(
+        db, user_id, bookmark_uuid, folder_uuid
+    )
     return {
         "status": "added",
         "bookmark_id": bookmark_id,
@@ -168,9 +171,10 @@ async def remove_bookmark_from_folder(
     from uuid import UUID
 
     user_id = current_user.id
+    bookmark_uuid = UUID(bookmark_id)
     folder_uuid = UUID(folder_id)
     await bookmark_service.remove_bookmark_from_folder(
-        db, user_id, bookmark_id, folder_uuid
+        db, user_id, bookmark_uuid, folder_uuid
     )
     return {"status": "removed", "bookmark_id": bookmark_id, "folder_id": folder_id}
 
@@ -183,8 +187,13 @@ async def get_bookmark_folders(
     db: AsyncSession = Depends(get_session),
 ):
     """Get folders containing a bookmark."""
+    from uuid import UUID
+
     user_id = current_user.id
-    folders = await bookmark_service.get_bookmark_folders(db, user_id, bookmark_id)
+    bookmark_uuid = UUID(bookmark_id)
+    folders = await bookmark_service.get_bookmark_folders(
+        db, user_id, str(bookmark_uuid)
+    )
     return folders
 
 
@@ -200,8 +209,9 @@ async def add_tag_to_bookmark(
     from uuid import UUID
 
     user_id = current_user.id
+    bookmark_uuid = UUID(bookmark_id)
     tag_uuid = UUID(request.tag_id)
-    await bookmark_service.add_tag_to_bookmark(db, user_id, bookmark_id, tag_uuid)
+    await bookmark_service.add_tag_to_bookmark(db, user_id, bookmark_uuid, tag_uuid)
     return {"status": "added", "bookmark_id": bookmark_id, "tag_id": request.tag_id}
 
 
@@ -217,8 +227,11 @@ async def remove_tag_from_bookmark(
     from uuid import UUID
 
     user_id = current_user.id
+    bookmark_uuid = UUID(bookmark_id)
     tag_uuid = UUID(tag_id)
-    await bookmark_service.remove_tag_from_bookmark(db, user_id, bookmark_id, tag_uuid)
+    await bookmark_service.remove_tag_from_bookmark(
+        db, user_id, bookmark_uuid, tag_uuid
+    )
     return {"status": "removed", "bookmark_id": bookmark_id, "tag_id": tag_id}
 
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +52,48 @@ class TagService:
 
         logger.info(f"Found {len(tag_list)} tags for user_id={user_id}")
         return tag_list
+
+    async def get_tag_by_name(
+        self, db: AsyncSession, user_id: UUID, name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a single tag by name.
+
+        Args:
+            db: SQLAlchemy session
+            user_id: The user's ID
+            name: The tag name
+
+        Returns:
+            Tag object or None
+        """
+        logger.info(f"Fetching tag '{name}' for user_id={user_id}")
+
+        result = await db.execute(
+            sa.select(TagModel).where(
+                TagModel.user_id == user_id,
+                TagModel.name == name,
+            )
+        )
+        tag = result.scalar_one_or_none()
+
+        if not tag:
+            return None
+
+        count_result = await db.execute(
+            sa.select(sa.func.count(bookmark_tags.c.bookmark_id)).where(
+                bookmark_tags.c.tag_id == tag.id
+            )
+        )
+        bookmark_count = count_result.scalar() or 0
+
+        return {
+            "id": str(tag.id),
+            "name": tag.name,
+            "color": tag.color,
+            "source": tag.source,
+            "bookmarkCount": bookmark_count,
+        }
 
     async def create_tag(
         self, db: AsyncSession, user_id: UUID, name: str, color: str = None
