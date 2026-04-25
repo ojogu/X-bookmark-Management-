@@ -245,11 +245,13 @@ class TwitterService:
                     "source",
                     "entities",
                     "attachments",
+                    "referenced_tweets",
                 ],
                 expansions=[
                     "author_id",
                     "attachments.media_keys",
                     "referenced_tweets.id",
+                    "referenced_tweets.id.author_id",
                 ],
                 user_fields=["id", "name", "username", "profile_image_url"],
                 media_fields=[
@@ -283,7 +285,9 @@ class TwitterService:
 
             if first_page:
                 logger.info(f"Successfully fetched bookmarks for user: {user_id}")
-                logger.info(f"response_data keys: {response_data.keys() if isinstance(response_data, dict) else type(response_data)}")
+                logger.info(
+                    f"response_data keys: {response_data.keys() if isinstance(response_data, dict) else type(response_data)}"
+                )
                 logger.info(f"includes present: {'includes' in response_data}")
                 return response_data
             else:

@@ -4,6 +4,7 @@ import type {
   Bookmark,
   Folder,
   Tag,
+  TweetType,
   UserProfile,
   SortOption,
   FilterState,
@@ -53,12 +54,25 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
         data: Array<{
           id: string
           bookmark_id: string
+          tweet_type: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
           tags: Array<{ id: string; name: string; color?: string }>
+          media?: {
+            media_key: string
+            type: string
+            url?: string
+            preview_image_url?: string
+            alt_text?: string
+          }
+          referenced_tweet?: {
+            id: string
+            text: string
+            author_id: string
+          }
         }>
         includes: {
           users: Array<{
@@ -67,20 +81,63 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
             name: string
             profile_image_url: string
           }>
+          media: Array<{
+            media_key: string
+            type: string
+            url?: string
+            preview_image_url?: string
+            alt_text?: string
+          }>
+          tweets: Array<{
+            id: string
+            text: string
+            author_id: string
+            created_at: string
+            lang: string
+            possibly_sensitive: boolean
+          }>
         }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?${params}`)
-      
+
       const response = res.data
 
-      // Transform backend response to frontend format
       const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
-      
+
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
+        const tweetType = (bookmark.tweet_type as TweetType) || 'plain'
+
+        let media = undefined
+        if (bookmark.media) {
+          media = {
+            url: bookmark.media.url,
+            preview_image_url: bookmark.media.preview_image_url,
+            type: bookmark.media.type,
+            alt_text: bookmark.media.alt_text,
+          }
+        }
+
+        let referencedTweet = undefined
+        if (bookmark.referenced_tweet) {
+          const refAuthor = usersMap.get(bookmark.referenced_tweet.author_id)
+          referencedTweet = {
+            id: bookmark.referenced_tweet.id,
+            text: bookmark.referenced_tweet.text,
+            author: {
+              id: refAuthor?.id || bookmark.referenced_tweet.author_id,
+              name: refAuthor?.name || 'Unknown',
+              handle: refAuthor?.username || 'unknown',
+              avatarUrl: refAuthor?.profile_image_url || null,
+              verified: false,
+            },
+          }
+        }
+
         return {
           id: bookmark.bookmark_id,
           tweetId: bookmark.id,
+          tweetType,
           text: bookmark.text,
           author: {
             id: author?.id || bookmark.author_id,
@@ -95,6 +152,8 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
+          media,
+          referencedTweet,
         }
       })
 
@@ -122,12 +181,25 @@ export function useUnreadBookmarks(page: number = 0) {
         data: Array<{
           id: string
           bookmark_id: string
+          tweet_type: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
           tags: Array<{ id: string; name: string; color?: string }>
+          media?: {
+            media_key: string
+            type: string
+            url?: string
+            preview_image_url?: string
+            alt_text?: string
+          }
+          referenced_tweet?: {
+            id: string
+            text: string
+            author_id: string
+          }
         }>
         includes: {
           users: Array<{
@@ -136,20 +208,56 @@ export function useUnreadBookmarks(page: number = 0) {
             name: string
             profile_image_url: string
           }>
+          tweets: Array<{
+            id: string
+            text: string
+            author_id: string
+            created_at: string
+            lang: string
+            possibly_sensitive: boolean
+          }>
         }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?unread=true&limit=${limit}&offset=${offset}`)
-      
+
       const response = res.data
 
-      // Transform backend response to frontend format
       const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
-      
+
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
+        const tweetType = (bookmark.tweet_type as TweetType) || 'plain'
+
+        let media = undefined
+        if (bookmark.media) {
+          media = {
+            url: bookmark.media.url,
+            preview_image_url: bookmark.media.preview_image_url,
+            type: bookmark.media.type,
+            alt_text: bookmark.media.alt_text,
+          }
+        }
+
+        let referencedTweet = undefined
+        if (bookmark.referenced_tweet) {
+          const refAuthor = usersMap.get(bookmark.referenced_tweet.author_id)
+          referencedTweet = {
+            id: bookmark.referenced_tweet.id,
+            text: bookmark.referenced_tweet.text,
+            author: {
+              id: refAuthor?.id || bookmark.referenced_tweet.author_id,
+              name: refAuthor?.name || 'Unknown',
+              handle: refAuthor?.username || 'unknown',
+              avatarUrl: refAuthor?.profile_image_url || null,
+              verified: false,
+            },
+          }
+        }
+
         return {
           id: bookmark.bookmark_id,
           tweetId: bookmark.id,
+          tweetType,
           text: bookmark.text,
           author: {
             id: author?.id || bookmark.author_id,
@@ -164,6 +272,8 @@ export function useUnreadBookmarks(page: number = 0) {
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
+          media,
+          referencedTweet,
         }
       })
 
@@ -301,12 +411,25 @@ export function useFolderBookmarks(
         data: Array<{
           id: string
           bookmark_id: string
+          tweet_type: string
           text: string
           author_id: string
           created_at: string
           lang: string
           possibly_sensitive: boolean
           tags: Array<{ id: string; name: string; color?: string }>
+          media?: {
+            media_key: string
+            type: string
+            url?: string
+            preview_image_url?: string
+            alt_text?: string
+          }
+          referenced_tweet?: {
+            id: string
+            text: string
+            author_id: string
+          }
         }>
         includes: {
           users: Array<{
@@ -315,20 +438,56 @@ export function useFolderBookmarks(
             name: string
             profile_image_url: string
           }>
+          tweets: Array<{
+            id: string
+            text: string
+            author_id: string
+            created_at: string
+            lang: string
+            possibly_sensitive: boolean
+          }>
         }
         meta: { result_count: number; total_count: number; next_token: string | null }
       }>(`/client/bookmarks?${params}`)
 
       const response = res.data
 
-      // Transform backend response to frontend format
       const usersMap = new Map(response.includes.users.map(u => [u.id, u]))
-      
+
       const transformedData: Bookmark[] = response.data.map(bookmark => {
         const author = usersMap.get(bookmark.author_id)
+        const tweetType = (bookmark.tweet_type as TweetType) || 'plain'
+
+        let media = undefined
+        if (bookmark.media) {
+          media = {
+            url: bookmark.media.url,
+            preview_image_url: bookmark.media.preview_image_url,
+            type: bookmark.media.type,
+            alt_text: bookmark.media.alt_text,
+          }
+        }
+
+        let referencedTweet = undefined
+        if (bookmark.referenced_tweet) {
+          const refAuthor = usersMap.get(bookmark.referenced_tweet.author_id)
+          referencedTweet = {
+            id: bookmark.referenced_tweet.id,
+            text: bookmark.referenced_tweet.text,
+            author: {
+              id: refAuthor?.id || bookmark.referenced_tweet.author_id,
+              name: refAuthor?.name || 'Unknown',
+              handle: refAuthor?.username || 'unknown',
+              avatarUrl: refAuthor?.profile_image_url || null,
+              verified: false,
+            },
+          }
+        }
+
         return {
           id: bookmark.bookmark_id,
           tweetId: bookmark.id,
+          tweetType,
           text: bookmark.text,
           author: {
             id: author?.id || bookmark.author_id,
@@ -343,6 +502,8 @@ export function useFolderBookmarks(
           folder: null,
           url: `https://x.com/i/bookmarks/${bookmark.id}`,
           faviconUrl: undefined,
+          media,
+          referencedTweet,
         }
       })
 

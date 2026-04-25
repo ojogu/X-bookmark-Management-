@@ -20,9 +20,25 @@ export interface Folder {
   bookmarkCount: number
 }
 
+export type TweetType = 'plain' | 'media' | 'retweet' | 'quote'
+
+export interface BookmarkMedia {
+  url?: string
+  preview_image_url?: string
+  type: string
+  alt_text?: string
+}
+
+export interface ReferencedTweet {
+  id: string
+  text: string
+  author: BookmarkAuthor
+}
+
 export interface Bookmark {
   id: string
   tweetId: string
+  tweetType: TweetType
   text: string
   author: BookmarkAuthor
   savedAt: string // ISO date string
@@ -31,7 +47,8 @@ export interface Bookmark {
   folder: Folder | null
   url: string
   faviconUrl?: string
-  mediaUrls?: string[]
+  media?: BookmarkMedia
+  referencedTweet?: ReferencedTweet
 }
 
 export interface UserProfile {

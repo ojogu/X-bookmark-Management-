@@ -33,6 +33,9 @@ class Bookmark(BaseModel):
     # read status
     is_read = sa.Column(sa.Boolean, default=False)
 
+    # referenced tweet ID for retweets/quotes
+    referenced_tweet_id = sa.Column(sa.String, nullable=True)
+
 
 class Folder(BaseModel):
     """

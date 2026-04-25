@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from datetime import datetime
 
 
-# ------------------
-# Author Info
-# ------------------
+TweetType = Literal["plain", "media", "retweet", "quote"]
+
+
 class Author(BaseModel):
     id: str
     username: str
@@ -15,9 +15,6 @@ class Author(BaseModel):
     model_config = ConfigDict(ser_json_t_encoders={HttpUrl: lambda v: str(v)})
 
 
-# ------------------
-# Metrics Info
-# ------------------
 class Metrics(BaseModel):
     retweet_count: int
     reply_count: int
@@ -27,9 +24,20 @@ class Metrics(BaseModel):
     impression_count: int
 
 
-# ------------------
-# Post Info
-# ------------------
+class Media(BaseModel):
+    media_key: str
+    media_type: str
+    url: Optional[str] = None
+    preview_image_url: Optional[str] = None
+    alt_text: Optional[str] = None
+
+
+class ReferencedTweet(BaseModel):
+    id: str
+    text: str
+    author: Author
+
+
 class Post(BaseModel):
     id: str
     text: str
@@ -38,11 +46,12 @@ class Post(BaseModel):
     metrics: Metrics
     lang: str
     possibly_sensitive: bool
+    tweet_type: TweetType = "plain"
+    media: Optional[Media] = None
+    referenced_tweet: Optional[ReferencedTweet] = None
+    referenced_tweet_id: Optional[str] = None
 
 
-# ------------------
-# Bookmark Info (nested post + author)
-# ------------------
 class Bookmark(BaseModel):
     internal_id: str
     post: Post

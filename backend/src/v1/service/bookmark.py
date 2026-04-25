@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 from .utils import _clean_structure, read_json_file
 
@@ -16,6 +17,8 @@ from src.v1.schema.bookmark import (
     Metrics,
     Post,
     Bookmark,
+    Media,
+    ReferencedTweet,
 )
 from src.v1.model import (
     Author as AuthorModel,
@@ -23,6 +26,7 @@ from src.v1.model import (
     Bookmark as BookmarkModel,
     Folder as FolderModel,
     Tag as TagModel,
+    Media as MediaModel,
     bookmark_folders,
     bookmark_tags,
 )
@@ -46,6 +50,114 @@ from src.v1.base.exception import (
 from src.utils.log import get_logger
 
 logger = get_logger(__name__)
+
+TCO_PATTERN = re.compile(r"^https://t\.co/[a-zA-Z0-9]{10}$")
+
+
+def _is_tco_only(text: str) -> bool:
+    stripped = text.strip()
+    return bool(TCO_PATTERN.match(stripped))
+
+
+def _strip_tco_trailing(text: str) -> str:
+    parts = text.strip().split()
+    if parts and TCO_PATTERN.match(parts[-1]):
+        parts = parts[:-1]
+        return " ".join(parts) + " ..."
+    return text
+
+
+def _classify_and_resolve(
+    tweet: Dict[str, Any],
+    tweets_map: Dict[str, Any],
+    media_map: Dict[str, Any],
+    authors_map: Dict[str, Any],
+) -> tuple:
+    refs = tweet.get("referenced_tweets", []) or []
+
+    for ref in refs:
+        if ref.get("type") == "retweeted":
+            ref_id = ref.get("id", "")
+            ref_tweet = tweets_map.get(ref_id)
+            ref_author_id = ref_tweet.get("author_id") if ref_tweet else None
+            ref_author_data = authors_map.get(ref_author_id) if ref_author_id else None
+            author = None
+            if ref_author_data:
+                author = Author(
+                    id=ref_author_data.get("id", ""),
+                    username=ref_author_data.get("username", ""),
+                    name=ref_author_data.get("name", ""),
+                    profile_image_url=ref_author_data.get("profile_image_url", None),
+                )
+            referenced_tweet = None
+            if ref_tweet:
+                ref_text = _strip_tco_trailing(ref_tweet.get("text", ""))
+                referenced_tweet = ReferencedTweet(
+                    id=ref_id,
+                    text=ref_text,
+                    author=author,
+                )
+            return (
+                "retweet",
+                "",
+                None,
+                referenced_tweet,
+                ref_id,
+            )
+
+    for ref in refs:
+        if ref.get("type") == "quoted":
+            ref_id = ref.get("id", "")
+            ref_tweet = tweets_map.get(ref_id)
+            ref_author_id = ref_tweet.get("author_id") if ref_tweet else None
+            ref_author_data = authors_map.get(ref_author_id) if ref_author_id else None
+            author = None
+            if ref_author_data:
+                author = Author(
+                    id=ref_author_data.get("id", ""),
+                    username=ref_author_data.get("username", ""),
+                    name=ref_author_data.get("name", ""),
+                    profile_image_url=ref_author_data.get("profile_image_url", None),
+                )
+            text = _strip_tco_trailing(tweet.get("text", ""))
+            referenced_tweet = None
+            if ref_tweet:
+                ref_text = _strip_tco_trailing(ref_tweet.get("text", ""))
+                referenced_tweet = ReferencedTweet(
+                    id=ref_id,
+                    text=ref_text,
+                    author=author,
+                )
+            return (
+                "quote",
+                text,
+                None,
+                referenced_tweet,
+                ref_id,
+            )
+
+    media_keys = tweet.get("attachments", {}).get("media_keys", []) or []
+    if media_keys:
+        first_key = media_keys[0]
+        media_data = media_map.get(first_key)
+        media = None
+        if media_data:
+            media = Media(
+                media_key=first_key,
+                media_type=media_data.get("type", ""),
+                url=media_data.get("url"),
+                preview_image_url=media_data.get("preview_image_url"),
+                alt_text=media_data.get("alt_text"),
+            )
+        text = _strip_tco_trailing(tweet.get("text", ""))
+        return ("media", text, media, None, None)
+
+    text = tweet.get("text", "")
+    if _is_tco_only(text):
+        return ("media", "", None, None, None)
+
+    text = _strip_tco_trailing(text)
+    return ("plain", text, None, None, None)
 
 
 class BookmarkService:
@@ -279,9 +391,14 @@ class BookmarkService:
 
         if not rows:
             logger.info(f"No bookmarks found for user_id={user_id}")
-            return {"data": [], "includes": {"users": []}, "meta": {"result_count": 0}}
+            return {
+                "data": [],
+                "includes": {"users": [], "media": [], "tweets": []},
+                "meta": {"result_count": 0},
+            }
 
         bookmark_ids = [bookmark.id for bookmark, post, author in rows]
+        post_ids = [post.id for bookmark, post, author in rows]
 
         tags_query = (
             sa.select(bookmark_tags.c.bookmark_id, TagModel)
@@ -302,6 +419,63 @@ class BookmarkService:
                 bookmark_tags_map[str(bookmark_id)] = []
             bookmark_tags_map[str(bookmark_id)].append(tag_dict)
 
+        media_query = sa.select(MediaModel).where(MediaModel.post_id.in_(post_ids))
+        media_result = await db.execute(media_query)
+        media_rows = media_result.all()
+        post_media_map: Dict[str, Dict[str, Any]] = {}
+        includes_media_map: Dict[str, Dict[str, Any]] = {}
+        for media in media_rows:
+            if media.post_id and str(media.post_id) not in post_media_map:
+                post_media_map[str(media.post_id)] = {
+                    "media_key": media.media_key,
+                    "type": media.media_type,
+                    "url": media.url,
+                    "preview_image_url": media.preview_image_url,
+                    "alt_text": media.alt_text,
+                }
+                includes_media_map[media.media_key] = post_media_map[str(media.post_id)]
+
+        ref_ids = list(
+            set(
+                bookmark.referenced_tweet_id
+                for bookmark, post, author in rows
+                if bookmark.referenced_tweet_id
+            )
+        )
+        includes_tweets_map: Dict[str, Dict[str, Any]] = {}
+        includes_users_map: Dict[str, Dict[str, Any]] = {}
+        if ref_ids:
+            ref_posts_query = (
+                sa.select(PostModel, AuthorModel)
+                .outerjoin(AuthorModel, PostModel.author_id == AuthorModel.id)
+                .where(PostModel.post_id.in_(ref_ids))
+            )
+            ref_result = await db.execute(ref_posts_query)
+            ref_rows = ref_result.all()
+            for ref_post, ref_author in ref_rows:
+                ref_author_x_id = ref_author.author_id_from_x if ref_author else ""
+                if ref_author_x_id and ref_author_x_id not in includes_users_map:
+                    includes_users_map[ref_author_x_id] = {
+                        "id": ref_author_x_id,
+                        "username": ref_author.username if ref_author else "",
+                        "name": ref_author.name if ref_author else "",
+                        "profile_image_url": ref_author.profile_image_url
+                        if ref_author
+                        else None,
+                    }
+                includes_tweets_map[ref_post.post_id] = {
+                    "id": ref_post.post_id,
+                    "text": ref_post.text,
+                    "author_id": ref_author_x_id,
+                    "created_at": (
+                        ref_post.created_at_from_twitter.isoformat()
+                        if ref_post.created_at_from_twitter
+                        else None
+                    ),
+                    "lang": ref_post.lang,
+                    "possibly_sensitive": ref_post.possibly_sensitive,
+                }
+
         data = []
         users_map = {}
 
@@ -315,30 +489,53 @@ class BookmarkService:
                     "profile_image_url": author.profile_image_url if author else None,
                 }
 
-            data.append(
-                {
-                    "id": post.post_id,
-                    "bookmark_id": str(bookmark.id),
-                    "text": post.text,
-                    "author_id": author_x_id,
-                    "created_at": (
-                        post.created_at_from_twitter.isoformat()
-                        if post.created_at_from_twitter
-                        else None
-                    ),
-                    "public_metrics": {
-                        "retweet_count": 0,
-                        "reply_count": 0,
-                        "like_count": 0,
-                        "quote_count": 0,
-                        "bookmark_count": 0,
-                        "impression_count": 0,
-                    },
-                    "lang": post.lang,
-                    "possibly_sensitive": post.possibly_sensitive,
-                    "tags": bookmark_tags_map.get(str(bookmark.id), []),
+            tweet_type = post.tweet_type or "plain"
+            media = post_media_map.get(str(post.id))
+
+            item = {
+                "id": post.post_id,
+                "bookmark_id": str(bookmark.id),
+                "tweet_type": tweet_type,
+                "text": post.text,
+                "author_id": author_x_id,
+                "created_at": (
+                    post.created_at_from_twitter.isoformat()
+                    if post.created_at_from_twitter
+                    else None
+                ),
+                "public_metrics": {
+                    "retweet_count": 0,
+                    "reply_count": 0,
+                    "like_count": 0,
+                    "quote_count": 0,
+                    "bookmark_count": 0,
+                    "impression_count": 0,
+                },
+                "lang": post.lang,
+                "possibly_sensitive": post.possibly_sensitive,
+                "tags": bookmark_tags_map.get(str(bookmark.id), []),
+            }
+
+            if media:
+                item["media"] = media
+
+            ref_tweet_id = bookmark.referenced_tweet_id
+            if ref_tweet_id and ref_tweet_id in includes_tweets_map:
+                ref_tweet = includes_tweets_map[ref_tweet_id]
+                ref_author_x_id = ref_tweet.get("author_id", "")
+                item["referenced_tweet"] = {
+                    "id": ref_tweet["id"],
+                    "text": ref_tweet["text"],
+                    "author_id": ref_author_x_id,
                 }
-            )
+            elif ref_tweet_id:
+                item["referenced_tweet"] = {
+                    "id": ref_tweet_id,
+                    "text": "This tweet is unavailable",
+                    "author_id": None,
+                }
+
+            data.append(item)
 
         count_query = sa.select(sa.func.count(BookmarkModel.user_id)).where(
             BookmarkModel.user_id == user_id
@@ -371,7 +568,11 @@ class BookmarkService:
 
         response = {
             "data": data,
-            "includes": {"users": list(users_map.values())},
+            "includes": {
+                "users": list(users_map.values()),
+                "media": list(includes_media_map.values()),
+                "tweets": list(includes_tweets_map.values()),
+            },
             "meta": {
                 "result_count": len(data),
                 "total_count": total_count,
@@ -473,9 +674,31 @@ class BookmarkService:
                     lang=post_data.get("lang", ""),
                     possibly_sensitive=post_data.get("possibly_sensitive", False),
                     author_id=author_model.id if author_model else None,
+                    tweet_type=post_data.get("tweet_type", "plain"),
                 )
                 db.add(post)
                 await db.flush()
+
+            if post_data.get("media") and not post.medias:
+                media_data = post_data["media"]
+                media_key = media_data.get("media_key", "")
+                if media_key:
+                    logger.debug(f"Creating media record for key {media_key}")
+                    existing_media = await db.execute(
+                        sa.select(MediaModel).where(MediaModel.media_key == media_key)
+                    )
+                    media_record = existing_media.scalar_one_or_none()
+                    if not media_record:
+                        media_record = MediaModel(
+                            post_id=post.id,
+                            media_key=media_key,
+                            media_type=media_data.get("media_type", ""),
+                            url=media_data.get("url", ""),
+                            preview_image_url=media_data.get("preview_image_url", ""),
+                            alt_text=media_data.get("alt_text", ""),
+                        )
+                        db.add(media_record)
+                        await db.flush()
 
             logger.debug(
                 f"Checking if bookmark exists for post {post.id} and user {user_id}"
@@ -484,11 +707,14 @@ class BookmarkService:
                 db, post_id=post.id, user_id=user_id
             )
 
+            ref_tweet_id = post_data.get("referenced_tweet_id")
+
             if not existing_bm:
                 logger.debug(f"Creating new bookmark for post {post.id}")
                 bookmark = BookmarkModel(
                     user_id=user_id,
                     post_id=post.id,
+                    referenced_tweet_id=ref_tweet_id,
                 )
                 db.add(bookmark)
             # Don't store tokens on individual bookmarks anymore
@@ -521,27 +747,19 @@ class BookmarkService:
     def parse_bookmarks_response(
         response: Dict[str, Any], user_id: str
     ) -> BookmarkResponse:
-        """
-        Parse Twitter bookmarks API response into structured BookmarkResponse.
-        Ensures safe defaults and joins tweet data with author data.
-
-        Args:
-            response: raw API response
-            user_id: ID of the user fetching bookmarks
-
-        Returns:
-            BookmarkResponse Pydantic model with validated and cleaned data.
-        """
-        logger.info(f"bookmark data: {response}")
         logger.info(f"Parsing bookmarks for user_id={user_id}")
+
         if isinstance(response, dict):
             tweets_data = response.get("data", [])
         elif isinstance(response, list):
             tweets_data = response
 
-        authors_map = {
-            u["id"]: u for u in response.get("includes", {}).get("users", []) or []
-        }
+        includes = response.get("includes", {}) or {}
+
+        authors_map = {u["id"]: u for u in includes.get("users", []) or []}
+        tweets_map = {t["id"]: t for t in includes.get("tweets", []) or []}
+        media_map = {m["media_key"]: m for m in includes.get("media", []) or []}
+
         meta = response.get("meta", {}) or {}
 
         bookmarks_list = []
@@ -550,9 +768,12 @@ class BookmarkService:
             if not tweet:
                 continue
 
-            author_data = authors_map.get(
-                tweet.get("author_id")
-            )  # None if missing, not empty dict
+            tweet_id = tweet.get("id", "")
+            tweet_type, text, media, referenced_tweet, referenced_tweet_id = (
+                _classify_and_resolve(tweet, tweets_map, media_map, authors_map)
+            )
+
+            author_data = authors_map.get(tweet.get("author_id"))
             if author_data:
                 author = Author(
                     id=author_data.get("id", ""),
@@ -563,7 +784,7 @@ class BookmarkService:
             else:
                 logger.warning(
                     f"No author data returned by X for author_id={tweet.get('author_id')} "
-                    f"on post={tweet.get('id')} — saving post with null author"
+                    f"on post={tweet_id} — saving post with null author"
                 )
                 author = None
 
@@ -578,17 +799,20 @@ class BookmarkService:
             )
 
             post = Post(
-                id=tweet.get("id", ""),
-                text=tweet.get("text", ""),
+                id=tweet_id,
+                text=text,
                 author_id=tweet.get("author_id", ""),
                 created_at=tweet.get("created_at"),
                 metrics=metrics,
                 lang=tweet.get("lang", ""),
                 possibly_sensitive=tweet.get("possibly_sensitive", False),
+                tweet_type=tweet_type,
+                media=media,
+                referenced_tweet=referenced_tweet,
+                referenced_tweet_id=referenced_tweet_id,
             )
 
             bookmark = Bookmark(internal_id=str(user_id), post=post, author=author)
-
             bookmarks_list.append(bookmark)
 
         structured_data = {
@@ -600,7 +824,6 @@ class BookmarkService:
         }
 
         cleaned_data = _clean_structure(structured_data)
-
         validated_response = BookmarkResponse(**cleaned_data)
 
         logger.info(

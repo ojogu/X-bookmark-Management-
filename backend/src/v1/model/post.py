@@ -38,6 +38,7 @@ class Post(BaseModel):
     possibly_sensitive = sa.Column(sa.Boolean, nullable=False)
 
     author_id = sa.Column(sa.UUID, sa.ForeignKey("authors.id"), nullable=True)
+    tweet_type = sa.Column(sa.String, nullable=True)
 
     # relationship back to media
     medias = relationship("Media", backref="posts")

@@ -284,8 +284,12 @@ def front_sync_bookmark_task(self, user_id):
                     await bookmark_service.save_bookmarks(
                         db,
                         user_id,
-                        {"data": new_bookmarks, "meta": meta},
+                        {
+                        "data": new_bookmarks, "meta": meta,
+                         "includes": response.get("includes", {}),  # preserve authors
+                        },
                         sync_time=current_time,
+                        
                     )
 
                     # Update watermark to newest from collected

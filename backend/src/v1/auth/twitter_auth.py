@@ -159,7 +159,7 @@ class TwitterAuthService(TokenRefreshService):
             await self.user_service.store_user_token(
                 user_id=user_id, user_token=self.token_response
             )
-            logger.info(f"Tokens stored for user_id: {user_data.id}")
+            logger.info(f"Tokens stored for user_id: {user_data.id}, tokens details: {self.token_response}")
 
             # Generate JWT tokens for the application
             payload = {"user_id": str(user_id), "x_id": user_data.x_id}
