@@ -36,14 +36,7 @@ interface BookmarkCardProps {
 }
 
 const openTweet = (tweetId: string) => {
-  const appUrl = `twitter://status?id=${tweetId}`
-  const webUrl = `https://x.com/i/web/status/${tweetId}`
-
-  window.location.href = appUrl
-
-  setTimeout(() => {
-    window.location.href = webUrl
-  }, 1500)
+  window.location.href = `https://x.com/i/web/status/${tweetId}`
 }
 
 function PlainBody({ bookmark }: { bookmark: Bookmark }) {
@@ -235,14 +228,20 @@ export default function BookmarkCard({
   const { id, isRead, tags } = bookmark
   const [open, setOpen] = useState(false)
   const [createFolderOpen, setCreateFolderOpen] = useState(false)
+  const [menuOpening, setMenuOpening] = useState(false)
 
   const tweetType = (bookmark.tweetType || 'plain') as TweetType
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setMenuOpening(true)
+      setTimeout(() => setMenuOpening(false), 300)
+    }
+    setOpen(isOpen)
+  }
+
   return (
-    <div
-      onClick={() => openTweet(bookmark.tweetId)}
-      style={{ cursor: 'pointer' }}
-    >
+    <div>
       <article
         className={`group relative rounded-xl border bg-card p-4 transition-colors hover:border-border-strong dark:bg-bg-card dark:border-border-subtle dark:hover:border-border-strong ${
           isRead ? 'border-border-subtle' : 'border-border-strong'
@@ -252,10 +251,12 @@ export default function BookmarkCard({
           <span className="absolute left-3.5 top-4 h-1.5 w-1.5 rounded-full bg-brand" />
         )}
 
-        {tweetType === 'media' && <MediaBody bookmark={bookmark} />}
-        {tweetType === 'retweet' && <RetweetBody bookmark={bookmark} />}
-        {tweetType === 'quote' && <QuoteBody bookmark={bookmark} />}
-        {tweetType === 'plain' && <PlainBody bookmark={bookmark} />}
+<div onClick={() => !menuOpening && openTweet(bookmark.tweetId)} style={{ cursor: 'pointer' }}>
+          {tweetType === 'media' && <MediaBody bookmark={bookmark} />}
+          {tweetType === 'retweet' && <RetweetBody bookmark={bookmark} />}
+          {tweetType === 'quote' && <QuoteBody bookmark={bookmark} />}
+          {tweetType === 'plain' && <PlainBody bookmark={bookmark} />}
+        </div>
 
         <div className="mt-3 flex items-center gap-1.5 pl-4">
           {tags.slice(0, 4).map((tag) => (
@@ -271,21 +272,35 @@ export default function BookmarkCard({
             <span className="text-xs text-muted-foreground dark:text-text-muted">+{tags.length - 4}</span>
           )}
 
-          <DropdownMenu open={open} onOpenChange={setOpen}>
+          <DropdownMenu open={open} onOpenChange={handleOpenChange}>
             <DropdownMenuTrigger asChild>
               <button
                 onClick={(e) => {
+                  e.preventDefault()
                   e.stopPropagation()
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-muted dark:text-text-muted dark:hover:bg-bg-subtle"
                 title="More actions"
               >
                 <MoreHorizontal size={13} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {onToggleRead && (
-                <DropdownMenuItem onClick={() => onToggleRead(id, !isRead)}>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+{onToggleRead && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onToggleRead(id, !isRead)
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   {isRead ? (
                     <>
                       <Circle size={14} className="mr-2" />
@@ -417,7 +432,11 @@ export default function BookmarkCard({
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={() => onDelete(id)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onDelete(id)
+                }}
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 size={14} className="mr-2" />

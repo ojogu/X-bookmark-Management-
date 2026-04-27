@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Input } from '@/components/ui/input'
@@ -26,11 +26,12 @@ import type { SortOption, FilterState } from '@/types'
 export default function FolderPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('date-desc')
   const [filter, setFilter] = useState<FilterState>({ tagIds: [] })
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
+  const page = Number(searchParams.get('page')) || 0
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -101,17 +102,26 @@ export default function FolderPage() {
 
   function handleSearchChange(value: string) {
     setSearch(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   function handleSortChange(value: SortOption) {
     setSort(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   function handleFilterChange(value: FilterState) {
     setFilter(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   const hasMore = bookmarksData?.pagination.hasMore ?? false
@@ -224,7 +234,7 @@ export default function FolderPage() {
           <div className="mt-6 flex justify-center">
             <Button
               variant="outline"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setSearchParams((prev) => { prev.set('page', String(page + 1)); return prev })}
               disabled={isFetching}
               className="border-border-subtle bg-bg-subtle text-text-secondary hover:text-text-primary"
             >

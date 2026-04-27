@@ -174,8 +174,12 @@ class BookmarkService:
         return result.scalar_one_or_none()
 
     async def check_if_post_exists(self, db: AsyncSession, post_id):
+        from sqlalchemy.orm import selectinload
+
         result = await db.execute(
-            sa.select(PostModel).where(post_id == PostModel.post_id)
+            sa.select(PostModel)
+            .where(post_id == PostModel.post_id)
+            .options(selectinload(PostModel.medias))
         )
         if not result:
             return None
@@ -421,7 +425,7 @@ class BookmarkService:
 
         media_query = sa.select(MediaModel).where(MediaModel.post_id.in_(post_ids))
         media_result = await db.execute(media_query)
-        media_rows = media_result.all()
+        media_rows = media_result.scalars().all()
         post_media_map: Dict[str, Dict[str, Any]] = {}
         includes_media_map: Dict[str, Dict[str, Any]] = {}
         for media in media_rows:
@@ -679,7 +683,7 @@ class BookmarkService:
                 db.add(post)
                 await db.flush()
 
-            if post_data.get("media") and not post.medias:
+            if post_data.get("media") and post.id:
                 media_data = post_data["media"]
                 media_key = media_data.get("media_key", "")
                 if media_key:
@@ -748,6 +752,7 @@ class BookmarkService:
         response: Dict[str, Any], user_id: str
     ) -> BookmarkResponse:
         logger.info(f"Parsing bookmarks for user_id={user_id}")
+        logger.debug(f"Full X response in parse: {response}")
 
         if isinstance(response, dict):
             tweets_data = response.get("data", [])

@@ -195,6 +195,7 @@ def front_sync_bookmark_task(self, user_id):
                     max_results=2,
                 )
 
+                logger.debug(f"X API raw response (front sync first page): {response}")
                 bookmarks = response.get("data", [])
                 meta = response.get("meta", {})
                 next_token = meta.get("next_token")
@@ -264,6 +265,9 @@ def front_sync_bookmark_task(self, user_id):
                         max_results=2,
                         pagination_token=next_token,
                     )
+                    logger.debug(
+                        f"X API raw response (front sync second page): {response2}"
+                    )
                     bookmarks2 = response2.get("data", [])
                     meta2 = response2.get("meta", {})
 
@@ -285,11 +289,13 @@ def front_sync_bookmark_task(self, user_id):
                         db,
                         user_id,
                         {
-                        "data": new_bookmarks, "meta": meta,
-                         "includes": response.get("includes", {}),  # preserve authors
+                            "data": new_bookmarks,
+                            "meta": meta,
+                            "includes": response.get(
+                                "includes", {}
+                            ),  # preserve authors
                         },
                         sync_time=current_time,
-                        
                     )
 
                     # Update watermark to newest from collected
@@ -399,6 +405,7 @@ def backfill_bookmark_task(self, user_id):
                     pagination_token=next_token,
                 )
 
+                logger.debug(f"X API raw response (backfill): {response}")
                 bookmarks = response.get("data", [])
                 meta = response.get("meta", {})
                 response_next_token = meta.get("next_token")

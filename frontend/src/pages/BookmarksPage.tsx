@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import BookmarkFeed from '@/components/bookmarks/BookmarkFeed'
 import BookmarkToolbar from '@/components/bookmarks/BookmarkToolbar'
@@ -19,11 +20,12 @@ import { useDebounce } from '@/hooks/useDebounce'
 import type { SortOption, FilterState } from '@/types'
 
 export default function BookmarksPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('date-desc')
   const [filter, setFilter] = useState<FilterState>({ tagIds: [] })
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
+  const page = Number(searchParams.get('page')) || 0
 
   const debouncedSearch = useDebounce(search, 350)
 
@@ -86,17 +88,26 @@ export default function BookmarksPage() {
 
   function handleSearchChange(value: string) {
     setSearch(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   function handleSortChange(value: SortOption) {
     setSort(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   function handleFilterChange(value: FilterState) {
     setFilter(value)
-    setPage(0)
+    setSearchParams((prev) => {
+      prev.set('page', '0')
+      return prev
+    })
   }
 
   const hasMore = data?.pagination.hasMore ?? false
@@ -150,7 +161,7 @@ export default function BookmarksPage() {
           <div className="mt-6 flex justify-center">
             <Button
               variant="outline"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setSearchParams((prev) => { prev.set('page', String(page + 1)); return prev })}
               disabled={isFetching}
               className="border-border-subtle bg-bg-subtle text-text-secondary hover:text-text-primary"
             >

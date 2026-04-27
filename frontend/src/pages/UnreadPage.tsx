@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import BookmarkFeed from '@/components/bookmarks/BookmarkFeed'
 import { Button } from '@/components/ui/button'
@@ -15,8 +16,9 @@ import {
 } from '@/features/bookmarks/hooks'
 
 export default function UnreadPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
+  const page = Number(searchParams.get('page')) || 0
   const { data, isLoading, isError, isFetching } = useUnreadBookmarks(page)
   const { data: foldersData } = useFolders()
   const { data: tagsData } = useTags()
@@ -92,7 +94,7 @@ export default function UnreadPage() {
           <div className="mt-6 flex justify-center">
             <Button
               variant="outline"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setSearchParams((prev) => { prev.set('page', String(page + 1)); return prev })}
               disabled={isFetching}
               className="border-border-subtle bg-bg-subtle text-text-secondary hover:text-text-primary"
             >

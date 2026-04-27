@@ -41,7 +41,7 @@ class Post(BaseModel):
     tweet_type = sa.Column(sa.String, nullable=True)
 
     # relationship back to media
-    medias = relationship("Media", backref="posts")
+    medias = relationship("Media", backref="posts", lazy="selectin")
 
 
 class Media(BaseModel):
@@ -67,18 +67,10 @@ class Media(BaseModel):
     # relationship: Posts 1 → N Media
     post_id = sa.Column(sa.UUID, sa.ForeignKey("posts.id"), nullable=False)
     media_key = sa.Column(sa.String, unique=True)
-    media_type = sa.Column(
-        sa.String, unique=True
-    )  # what kind of media it is (photo, video, animated_gif).
-    url = sa.Column(
-        sa.String, unique=True
-    )  # direct link to the media (only for images, not full videos).
-    preview_image_url = sa.Column(
-        sa.String, unique=True
-    )  # thumbnail for videos and GIFs (since videos don't give full direct URL).
-    alt_text = sa.Column(
-        sa.String, unique=True
-    )  # accessibility text (e.g., description for blind users).
+    media_type = sa.Column(sa.String)
+    url = sa.Column(sa.String, nullable=True)
+    preview_image_url = sa.Column(sa.String, nullable=True)
+    alt_text = sa.Column(sa.String, nullable=True)
 
 
 class MetaData(BaseModel):
